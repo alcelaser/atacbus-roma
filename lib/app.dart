@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'presentation/providers/sync_provider.dart';
 
-class AtacBusApp extends StatelessWidget {
+class AtacBusApp extends ConsumerWidget {
   const AtacBusApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'ATAC Bus Roma',
       theme: AppTheme.lightTheme(),
