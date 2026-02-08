@@ -4,6 +4,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/stop_detail/stop_detail_screen.dart';
 import '../../presentation/screens/route_browser/route_browser_screen.dart';
+import '../../presentation/screens/route_detail/route_detail_screen.dart';
 import '../../presentation/screens/map/map_screen.dart';
 import '../../presentation/screens/alerts/alerts_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
@@ -54,6 +55,14 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         final stopId = state.pathParameters['stopId']!;
         return StopDetailScreen(stopId: stopId);
+      },
+    ),
+    GoRoute(
+      path: '/route/:routeId',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final routeId = state.pathParameters['routeId']!;
+        return RouteDetailScreen(routeId: routeId);
       },
     ),
     GoRoute(

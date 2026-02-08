@@ -111,9 +111,10 @@ lib/
       sync_provider.dart             # databaseProvider, preferencesStorageProvider, syncRepositoryProvider, hasCompletedSyncProvider
       gtfs_providers.dart            # gtfsRepositoryProvider, realtimeRepositoryProvider, connectivityProvider, isOnlineProvider, searchResultsProvider, stopDeparturesProvider, favoriteStopIdsProvider, ...
     screens/
-      home/home_screen.dart          # Search bar (live results), favorites section, sync redirect
+      home/home_screen.dart          # Search bar (live results), favorites with live departure countdown + LIVE badges
       stop_detail/stop_detail_screen.dart  # Departure list, RT auto-refresh (30s), offline banner, favorite toggle, pull-to-refresh
-      route_browser/route_browser_screen.dart  # (placeholder - Phase 5)
+      route_browser/route_browser_screen.dart  # Tabbed route list (All/Bus/Tram/Metro), LineBadge, tap to route detail
+      route_detail/route_detail_screen.dart  # Route info + ordered stop list with timeline indicator, tap to stop detail
       map/map_screen.dart            # (placeholder - Phase 6)
       alerts/alerts_screen.dart      # (placeholder - Phase 7)
       settings/settings_screen.dart  # (placeholder - Phase 7)
@@ -274,7 +275,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## Testing
 
-75 unit tests across four test files:
+88 unit tests across five test files:
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -282,6 +283,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 | `test/unit/phase2_test.dart` | 17 | All GTFS model `fromCsvRow` factories, CSV-to-model integration |
 | `test/unit/phase3_test.dart` | 13 | SearchStops use case, ToggleFavorite use case, Departure entity, RouteEntity type flags |
 | `test/unit/phase4_test.dart` | 20 | RT models, Vehicle/ServiceAlert entities, GetStopDepartures RT merge + fallback + sorting + 90-min window, MockRealtimeRepository |
+| `test/unit/phase5_test.dart` | 13 | Route type filtering (Bus/Tram/Metro), GetRouteDetails use case, GetRoutesForStop use case, RouteEntity properties, Stop entity |
 
 Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` implementing the abstract interfaces (no external mocking library needed for use case tests).
 
@@ -293,10 +295,10 @@ Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` imp
 | v0.0.2 | `v0.0.2` | GTFS Data Layer: Drift DB (8 tables), CSV parser, ZIP download, batch import, sync screen |
 | v0.0.3 | `v0.0.3` | Stop Search + Timetable: domain layer, search, scheduled departures, home + stop detail screens |
 | v0.0.4 | `v0.0.4` | Real-Time Integration: GTFS-RT protobuf parsing, delay overlay on departures, 30s auto-refresh, connectivity detection, offline banner |
+| v0.0.5 | `v0.0.5` | Route Browser + Favorites: tabbed route list (Bus/Tram/Metro), route detail with timeline stop list, reactive favorites with live departure countdown |
 
 ## Roadmap
 
-- **v0.0.5** - Route Browser + Favorites: browse lines by type (Bus/Tram/Metro), reactive favorites with live countdown
 - **v0.0.6** - Map View: OpenStreetMap with clustered stop markers, live bus positions, route polylines, nearby stops (GPS)
 - **v0.0.7** - Alerts + Polish: service disruption cards, settings (theme toggle, re-sync), loading skeletons, empty states
 - **v0.1.0** - MVP: full test suite, QA pass, first stable release

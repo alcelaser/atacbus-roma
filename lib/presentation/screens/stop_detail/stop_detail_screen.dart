@@ -141,15 +141,18 @@ class _StopDetailScreenState extends ConsumerState<StopDetailScreen> {
                                 padding: const EdgeInsets.all(16),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.location_on, color: theme.colorScheme.primary),
+                                    Icon(Icons.location_on,
+                                        color: theme.colorScheme.primary),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             stop.stopName,
-                                            style: theme.textTheme.titleMedium?.copyWith(
+                                            style: theme.textTheme.titleMedium
+                                                ?.copyWith(
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
