@@ -20,7 +20,7 @@ The project follows **Clean Architecture** with three layers:
 
 **Navigation**: `go_router` with a `ShellRoute` wrapping the four main tabs (Home, Lines, Map, Alerts) in a `NavigationBar`. Stop detail, settings, and sync routes live outside the shell as full-screen pushes.
 
-**Database**: `drift` (SQLite) with 8 tables, 7 performance indexes, batch inserts (5000 rows/transaction), and code-generated data classes via `build_runner`. In-memory caching in `GtfsRepositoryImpl` for all-stops, all-routes, and active service IDs (auto-refreshes per service date).
+**Database**: `drift` (SQLite) with 8 tables, 9 performance indexes (including composite `(stop_id, departure_time)` for fast departure lookups), batch inserts (5000 rows/transaction), schema migration (v1→v2), and code-generated data classes via `build_runner`. In-memory caching in `GtfsRepositoryImpl` for all-stops, all-routes, and active service IDs (auto-refreshes per service date). SQL injection prevention in LIKE queries. Empty primary key validation in CSV import pipeline.
 
 ## Data Sources
 
@@ -125,6 +125,23 @@ lib/
       departure_tile.dart            # ListTile with LineBadge, headsign, schedule, LIVE badge, countdown
 ```
 
+### Test Structure
+
+```
+test/
+  widget_test.dart                     # Theme, DateTimeUtils, DistanceUtils, GtfsCsvParser
+  unit/
+    phase2_test.dart                   # GTFS model fromCsvRow factories
+    phase3_test.dart                   # SearchStops, ToggleFavorite, Departure, RouteEntity
+    phase4_test.dart                   # RT models, GetStopDepartures RT merge + fallback
+    phase5_test.dart                   # Route type filtering, GetRouteDetails, GetRoutesForStop
+    phase6_test.dart                   # Map coordinates, Vehicle filtering, distance calcs
+    phase7_test.dart                   # ServiceAlert, ThemeMode, AppConstants, alert filtering
+    departure_comprehensive_test.dart  # 78 edge-case tests for GTFS time + departures
+  integration/
+    database_integration_test.dart     # 90 real-DB tests (in-memory SQLite, no mocks)
+```
+
 ## Database Schema
 
 8 Drift tables with composite primary keys where appropriate:
@@ -134,9 +151,9 @@ lib/
 | `gtfs_stops` | `stop_id` | ~12,000 | `stop_name COLLATE NOCASE` |
 | `gtfs_routes` | `route_id` | ~400 | - |
 | `gtfs_trips` | `trip_id` | ~50,000 | `route_id`, `service_id` |
-| `gtfs_stop_times` | `(trip_id, stop_sequence)` | ~1,200,000 | `stop_id`, `trip_id` |
+| `gtfs_stop_times` | `(trip_id, stop_sequence)` | ~1,200,000 | `stop_id`, `(stop_id, departure_time)`, `trip_id` |
 | `gtfs_calendar` | `service_id` | ~50 | - |
-| `gtfs_calendar_dates` | `(service_id, date)` | ~3,000 | `date` |
+| `gtfs_calendar_dates` | `(service_id, date)` | ~3,000 | `date`, `service_id` |
 | `gtfs_shapes` | `(shape_id, shape_pt_sequence)` | ~800,000 | `shape_id` |
 | `favorite_stops` | `stop_id` | user data | - |
 
@@ -241,6 +258,7 @@ Bilingual (EN + IT) via `flutter_localizations` + ARB files. System language det
 | Package | Purpose |
 |---------|---------|
 | `build_runner` + `drift_dev` | Drift code generation |
+| `drift` (native) + `sqlite3` | In-memory SQLite for integration tests |
 | `mocktail` | Test mocking |
 | `flutter_lints` | Static analysis |
 
@@ -276,7 +294,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## Testing
 
-196 unit tests across eight test files:
+339 tests across nine test files (249 unit + 90 integration):
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -288,8 +306,9 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 | `test/unit/phase6_test.dart` | 10 | Stop coordinates, Vehicle map filtering, nearby stops distance calculation, bearing-to-radians conversion |
 | `test/unit/departure_comprehensive_test.dart` | 78 | GTFS time edge cases, service date logic, Departure entity, DepartureRow mapping, GetStopDepartures (time window, RT merge, sorting, edge cases), calendar service ID resolution, after-midnight fix verification |
 | `test/unit/phase7_test.dart` | 20 | ServiceAlert entity, ThemeMode persistence logic, AppConstants, vehicle display/filtering, alert filtering by route/stop/time period |
+| `test/integration/database_integration_test.dart` | 90 | **Real in-memory SQLite** (no mocks): Stop/Route/Trip/StopTime/Calendar/Favorite CRUD, JOIN queries, `GtfsRepositoryImpl` integration (search, caching, calendar resolution with exceptions), `GetStopDepartures` use case with real DB + RT mock merge, `GtfsCsvParser` edge cases (BOM, quotes, CRLF, escaped quotes), full E2E pipeline (CSV → parse → DB → repository → use case), `DateTimeUtils` comprehensive edge tests, `Departure` entity + `DepartureRow` mapping resilience |
 
-Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` implementing the abstract interfaces (no external mocking library needed for use case tests).
+Testing strategy: unit tests use hand-rolled mock repositories implementing abstract interfaces. Integration tests use real in-memory SQLite databases via `NativeDatabase.memory()` to validate the full stack without mocks.
 
 ## Releases
 
@@ -302,6 +321,8 @@ Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` imp
 | v0.0.5 | `v0.0.5` | Route Browser + Favorites: tabbed route list (Bus/Tram/Metro), route detail with timeline stop list, reactive favorites with live departure countdown |
 | v0.0.6 | `v0.0.6` | Map View + Departure Fix + Caching: flutter_map + OSM tiles, stop markers with bottom sheet, live vehicle positions (30s refresh), user GPS location, bearing rotation; fixed departure times (JOIN query, calendar fallback, after-midnight fix); in-memory caching for stops/routes/service IDs; 78 new comprehensive tests |
 | v0.0.7 | `v0.0.7` | Alerts + Polish: service alert cards with route/stop chips, settings screen with theme toggle (light/dark/system), re-sync with confirmation dialog, last sync date display, about section, persistent theme mode via SharedPreferences |
+| v0.0.8 | `v0.0.8` | BOM fix + CSV parser hardening: fixed UTF-8 BOM stripping in GtfsCsvParser causing header mismatch during GTFS import |
+| v0.0.9 | `v0.0.9` | Database hardening + real integration tests: schema migration (v1→v2), composite `(stop_id, departure_time)` index, N+1 query elimination in `getStopsForRoute` (single JOIN), SQL injection prevention in LIKE queries, empty PK validation in all 7 CSV parsers, cache invalidation after sync, 90 real-DB integration tests using in-memory SQLite |
 
 ## Roadmap
 
