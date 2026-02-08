@@ -31,7 +31,7 @@ final syncProgressProvider = StreamProvider.autoDispose<SyncProgress>((ref) {
   return syncRepo.syncGtfsData();
 });
 
-final hasCompletedSyncProvider = FutureProvider<bool>((ref) {
+final hasCompletedSyncProvider = FutureProvider.autoDispose<bool>((ref) {
   final prefs = ref.watch(preferencesStorageProvider);
   return prefs.hasCompletedSync();
 });

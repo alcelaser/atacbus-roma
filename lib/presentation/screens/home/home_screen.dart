@@ -30,9 +30,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    // Check if we need initial sync
+    // Check if we need initial sync.
+    // Only redirect when we have a confirmed AsyncData(false) — NOT during
+    // AsyncLoading (which preserves the stale previous value after invalidation).
     final hasSync = ref.watch(hasCompletedSyncProvider);
-    if (hasSync.valueOrNull == false) {
+    if (!hasSync.isLoading && hasSync.valueOrNull == false) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/sync');
       });

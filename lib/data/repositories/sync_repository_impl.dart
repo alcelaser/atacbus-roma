@@ -171,9 +171,14 @@ class SyncRepositoryImpl {
     final lines = normalized.split('\n');
     if (lines.isEmpty) return;
 
-    // Parse header
-    final headerLine = lines.first;
-    final headers = headerLine.split(',').map((h) => h.trim()).toList();
+    // Parse header — use _splitCsvLine (not plain split) so that
+    // quoted headers like "trip_id" are correctly unquoted.
+    // Also strip a potential UTF-8 BOM at the start of the file.
+    var headerLine = lines.first;
+    if (headerLine.isNotEmpty && headerLine.codeUnitAt(0) == 0xFEFF) {
+      headerLine = headerLine.substring(1);
+    }
+    final headers = _splitCsvLine(headerLine).map((h) => h.trim()).toList();
 
     final totalDataLines = lines.length - 1; // minus header
     if (totalDataLines <= 0) return;

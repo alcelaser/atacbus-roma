@@ -129,7 +129,15 @@ class GtfsRepositoryImpl implements GtfsRepository {
   List<Departure> _rowsToDepartures(List<DepartureRow> rows) {
     final departures = <Departure>[];
     for (final row in rows) {
-      final seconds = DateTimeUtils.parseGtfsTime(row.departureTime);
+      // Skip rows with empty or malformed departure_time rather than
+      // letting a single bad row crash all departures for this stop.
+      if (row.departureTime.trim().isEmpty) continue;
+      final int seconds;
+      try {
+        seconds = DateTimeUtils.parseGtfsTime(row.departureTime);
+      } catch (_) {
+        continue; // malformed time — skip this row
+      }
       departures.add(Departure(
         tripId: row.tripId,
         routeId: row.routeId,

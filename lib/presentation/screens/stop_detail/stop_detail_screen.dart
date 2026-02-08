@@ -61,14 +61,23 @@ class _StopDetailScreenState extends ConsumerState<StopDetailScreen> {
                 color: isFav ? const Color(0xFFDAA520) : null,
               ),
               onPressed: () async {
-                final toggle = ref.read(toggleFavoriteProvider);
-                await toggle(widget.stopId);
-                ref.invalidate(isFavoriteProvider(widget.stopId));
-                ref.invalidate(favoriteStopIdsProvider);
+                try {
+                  final toggle = ref.read(toggleFavoriteProvider);
+                  await toggle(widget.stopId);
+                  ref.invalidate(isFavoriteProvider(widget.stopId));
+                } catch (_) {
+                  // Silently ignore toggle failures
+                }
               },
             ),
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            loading: () => const IconButton(
+              icon: Icon(Icons.star_border),
+              onPressed: null,
+            ),
+            error: (_, __) => const IconButton(
+              icon: Icon(Icons.star_border),
+              onPressed: null,
+            ),
           ),
         ],
       ),

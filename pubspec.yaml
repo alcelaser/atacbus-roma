@@ -54,6 +54,7 @@ dev_dependencies:
   mocktail: ^1.0.1
   build_runner: ^2.4.7
   drift_dev: ^2.14.1
+  sqlite3: ^2.4.0
 
 flutter:
   uses-material-design: true
