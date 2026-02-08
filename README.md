@@ -110,14 +110,15 @@ lib/
     providers/
       sync_provider.dart             # databaseProvider, preferencesStorageProvider, syncRepositoryProvider, hasCompletedSyncProvider
       gtfs_providers.dart            # gtfsRepositoryProvider, realtimeRepositoryProvider, connectivityProvider, isOnlineProvider, searchResultsProvider, stopDeparturesProvider, favoriteStopIdsProvider, ...
+      theme_provider.dart            # themeModeProvider (StateNotifier), lastSyncDateProvider, persists theme to SharedPreferences
     screens/
       home/home_screen.dart          # Search bar (live results), favorites with live departure countdown + LIVE badges
       stop_detail/stop_detail_screen.dart  # Departure list, RT auto-refresh (30s), offline banner, favorite toggle, pull-to-refresh
       route_browser/route_browser_screen.dart  # Tabbed route list (All/Bus/Tram/Metro), LineBadge, tap to route detail
       route_detail/route_detail_screen.dart  # Route info + ordered stop list with timeline indicator, tap to stop detail
       map/map_screen.dart            # flutter_map + OSM tiles, stop markers, live vehicle positions, user GPS location, bottom sheet stop info
-      alerts/alerts_screen.dart      # (placeholder - Phase 7)
-      settings/settings_screen.dart  # (placeholder - Phase 7)
+      alerts/alerts_screen.dart      # Service alert cards with route/stop chips, offline banner, pull-to-refresh
+      settings/settings_screen.dart  # Theme toggle (system/light/dark), re-sync with confirmation, last sync date, about
       sync/sync_screen.dart          # Multi-stage progress bar, friendly error messages, retry
     widgets/
       line_badge.dart                # Colored route badge (parses GTFS hex color)
@@ -275,7 +276,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## Testing
 
-176 unit tests across seven test files:
+196 unit tests across eight test files:
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -286,6 +287,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 | `test/unit/phase5_test.dart` | 13 | Route type filtering (Bus/Tram/Metro), GetRouteDetails use case, GetRoutesForStop use case, RouteEntity properties, Stop entity |
 | `test/unit/phase6_test.dart` | 10 | Stop coordinates, Vehicle map filtering, nearby stops distance calculation, bearing-to-radians conversion |
 | `test/unit/departure_comprehensive_test.dart` | 78 | GTFS time edge cases, service date logic, Departure entity, DepartureRow mapping, GetStopDepartures (time window, RT merge, sorting, edge cases), calendar service ID resolution, after-midnight fix verification |
+| `test/unit/phase7_test.dart` | 20 | ServiceAlert entity, ThemeMode persistence logic, AppConstants, vehicle display/filtering, alert filtering by route/stop/time period |
 
 Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` implementing the abstract interfaces (no external mocking library needed for use case tests).
 
@@ -299,10 +301,10 @@ Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` imp
 | v0.0.4 | `v0.0.4` | Real-Time Integration: GTFS-RT protobuf parsing, delay overlay on departures, 30s auto-refresh, connectivity detection, offline banner |
 | v0.0.5 | `v0.0.5` | Route Browser + Favorites: tabbed route list (Bus/Tram/Metro), route detail with timeline stop list, reactive favorites with live departure countdown |
 | v0.0.6 | `v0.0.6` | Map View + Departure Fix + Caching: flutter_map + OSM tiles, stop markers with bottom sheet, live vehicle positions (30s refresh), user GPS location, bearing rotation; fixed departure times (JOIN query, calendar fallback, after-midnight fix); in-memory caching for stops/routes/service IDs; 78 new comprehensive tests |
+| v0.0.7 | `v0.0.7` | Alerts + Polish: service alert cards with route/stop chips, settings screen with theme toggle (light/dark/system), re-sync with confirmation dialog, last sync date display, about section, persistent theme mode via SharedPreferences |
 
 ## Roadmap
 
-- **v0.0.7** - Alerts + Polish: service disruption cards, settings (theme toggle, re-sync), loading skeletons, empty states
 - **v0.1.0** - MVP: full test suite, QA pass, first stable release
 
 ## License
