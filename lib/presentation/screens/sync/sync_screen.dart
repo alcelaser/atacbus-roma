@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/repositories/sync_repository_impl.dart';
+import '../../providers/gtfs_providers.dart';
 import '../../providers/sync_provider.dart';
 
 class SyncScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,7 @@ class _SyncScreenState extends ConsumerState<SyncScreen> {
           setState(() {
             _currentProgress = progress;
             if (progress.stage == SyncStage.complete) {
+              ref.read(gtfsRepositoryProvider).clearCache();
               ref.invalidate(hasCompletedSyncProvider);
               Future.delayed(const Duration(milliseconds: 500), () {
                 if (mounted) context.go('/');

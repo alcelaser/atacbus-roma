@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart';
 import '../../core/utils/date_time_utils.dart';
 import '../../domain/entities/stop.dart';
 import '../../domain/entities/route_entity.dart';
@@ -10,6 +9,24 @@ class GtfsRepositoryImpl implements GtfsRepository {
   final AppDatabase _db;
 
   GtfsRepositoryImpl(this._db);
+
+  // ─── In-memory caches ─────────────────────────────────────
+  // Service IDs only change when the date rolls over, so cache
+  // them keyed by the GTFS date string (YYYYMMDD).
+  String? _cachedServiceDate;
+  Set<String>? _cachedServiceIds;
+
+  // All-stops / all-routes are large but static between syncs.
+  List<Stop>? _cachedAllStops;
+  List<RouteEntity>? _cachedAllRoutes;
+
+  /// Clear all caches (call after a re-sync).
+  void clearCache() {
+    _cachedServiceDate = null;
+    _cachedServiceIds = null;
+    _cachedAllStops = null;
+    _cachedAllRoutes = null;
+  }
 
   // ─── Stop conversion ────────────────────────────────────────
 
@@ -50,90 +67,93 @@ class GtfsRepositoryImpl implements GtfsRepository {
 
   @override
   Future<List<Stop>> getAllStops() async {
+    if (_cachedAllStops != null) return _cachedAllStops!;
     final results = await _db.getAllStops();
-    return results.map(_mapStop).toList();
+    _cachedAllStops = results.map(_mapStop).toList();
+    return _cachedAllStops!;
   }
 
   // ─── Routes ─────────────────────────────────────────────────
 
   @override
   Future<List<RouteEntity>> getAllRoutes() async {
+    if (_cachedAllRoutes != null) return _cachedAllRoutes!;
     final results = await _db.getAllRoutes();
-    return results.map(_mapRoute).toList();
+    _cachedAllRoutes = results.map(_mapRoute).toList();
+    return _cachedAllRoutes!;
   }
 
   @override
   Future<List<RouteEntity>> getRoutesByType(int type) async {
-    final results = await _db.getRoutesByType(type);
-    return results.map(_mapRoute).toList();
+    // Leverage the allRoutes cache if available
+    final all = await getAllRoutes();
+    return all.where((r) => r.routeType == type).toList();
   }
 
   @override
   Future<RouteEntity?> getRouteById(String routeId) async {
-    final r = await _db.getRouteById(routeId);
-    return r != null ? _mapRoute(r) : null;
+    // Try cache first
+    final all = await getAllRoutes();
+    final matches = all.where((r) => r.routeId == routeId);
+    return matches.isNotEmpty ? matches.first : null;
   }
 
-  // ─── Departures ─────────────────────────────────────────────
+  // ─── Departures (single JOIN query) ───────────────────────────
 
   @override
   Future<List<Departure>> getScheduledDepartures(String stopId) async {
-    // 1. Determine today's active service IDs
+    // 1. Determine active service IDs for today (cached per date)
     final serviceDate = DateTimeUtils.getServiceDate();
     final dateStr = DateTimeUtils.toGtfsDate(serviceDate);
     final weekday = serviceDate.weekday;
 
-    final activeServiceIds = await _getActiveServiceIds(dateStr, weekday);
-    if (activeServiceIds.isEmpty) return [];
+    var activeServiceIds = await _getCachedServiceIds(dateStr, weekday);
 
-    // 2. Get all stop times for this stop
-    final stopTimes = await _db.getStopTimesForStop(stopId);
-    if (stopTimes.isEmpty) return [];
-
-    // 3. Get trip IDs and look up routes
-    final tripIds = stopTimes.map((st) => st.tripId).toSet();
-    final tripRouteMap = <String, GtfsTrip>{};
-    for (final tripId in tripIds) {
-      final trip = await _db.getTripById(tripId);
-      if (trip != null && activeServiceIds.contains(trip.serviceId)) {
-        tripRouteMap[tripId] = trip;
-      }
+    // 2. Fallback: if calendar doesn't cover today (expired data),
+    //    use all service IDs so the user still sees times.
+    if (activeServiceIds.isEmpty) {
+      activeServiceIds = await _db.getAllServiceIds();
     }
 
-    // 4. Build a route cache
-    final routeCache = <String, GtfsRoute>{};
-    for (final trip in tripRouteMap.values) {
-      if (!routeCache.containsKey(trip.routeId)) {
-        final route = await _db.getRouteById(trip.routeId);
-        if (route != null) routeCache[trip.routeId] = route;
-      }
+    // 3. Single JOIN query: stop_times + trips + routes
+    final rows = await _db.getDeparturesForStop(stopId, activeServiceIds);
+    if (rows.isEmpty) {
+      // Last resort: try with no service filter at all
+      final allRows = await _db.getDeparturesForStop(stopId, {});
+      return _rowsToDepartures(allRows);
     }
 
-    // 5. Build departures
+    return _rowsToDepartures(rows);
+  }
+
+  List<Departure> _rowsToDepartures(List<DepartureRow> rows) {
     final departures = <Departure>[];
-    for (final st in stopTimes) {
-      final trip = tripRouteMap[st.tripId];
-      if (trip == null) continue;
-
-      final route = routeCache[trip.routeId];
-      if (route == null) continue;
-
-      final seconds = DateTimeUtils.parseGtfsTime(st.departureTime);
-
+    for (final row in rows) {
+      final seconds = DateTimeUtils.parseGtfsTime(row.departureTime);
       departures.add(Departure(
-        tripId: st.tripId,
-        routeId: trip.routeId,
-        routeShortName: route.routeShortName,
-        routeColor: route.routeColor,
-        tripHeadsign: trip.tripHeadsign ?? st.stopHeadsign,
-        directionId: trip.directionId,
-        scheduledTime: st.departureTime,
+        tripId: row.tripId,
+        routeId: row.routeId,
+        routeShortName: row.routeShortName,
+        routeColor: row.routeColor,
+        tripHeadsign: row.tripHeadsign ?? row.stopHeadsign,
+        directionId: row.directionId,
+        scheduledTime: row.departureTime,
         scheduledSeconds: seconds,
       ));
     }
-
     departures.sort((a, b) => a.scheduledSeconds.compareTo(b.scheduledSeconds));
     return departures;
+  }
+
+  /// Returns cached service IDs for the given date, refreshing only
+  /// when the date changes (typically once per day).
+  Future<Set<String>> _getCachedServiceIds(String dateStr, int weekday) async {
+    if (_cachedServiceDate == dateStr && _cachedServiceIds != null) {
+      return _cachedServiceIds!;
+    }
+    _cachedServiceIds = await _getActiveServiceIds(dateStr, weekday);
+    _cachedServiceDate = dateStr;
+    return _cachedServiceIds!;
   }
 
   Future<Set<String>> _getActiveServiceIds(String dateStr, int weekday) async {
@@ -184,7 +204,6 @@ class GtfsRepositoryImpl implements GtfsRepository {
 
   @override
   Future<List<Stop>> getStopsForRoute(String routeId) async {
-    // Get one trip for this route to determine stop order
     final trips = await _db.getTripsByRouteId(routeId);
     if (trips.isEmpty) return [];
 
@@ -199,21 +218,8 @@ class GtfsRepositoryImpl implements GtfsRepository {
 
   @override
   Future<List<RouteEntity>> getRoutesForStop(String stopId) async {
-    // Get all stop_times for this stop, extract unique route IDs via trips
-    final stopTimes = await _db.getStopTimesForStop(stopId);
-    final routeIds = <String>{};
-    for (final st in stopTimes) {
-      final trip = await _db.getTripById(st.tripId);
-      if (trip != null) routeIds.add(trip.routeId);
-    }
-
-    final routes = <RouteEntity>[];
-    for (final routeId in routeIds) {
-      final route = await _db.getRouteById(routeId);
-      if (route != null) routes.add(_mapRoute(route));
-    }
-    routes.sort((a, b) => a.routeShortName.compareTo(b.routeShortName));
-    return routes;
+    final results = await _db.getRoutesForStopJoin(stopId);
+    return results.map(_mapRoute).toList();
   }
 
   // ─── Favorites ──────────────────────────────────────────────

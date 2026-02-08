@@ -106,6 +106,32 @@ class FavoriteStops extends Table {
   Set<Column> get primaryKey => {stopId};
 }
 
+// ─── Departure row (from JOIN query) ────────────────────────────
+
+class DepartureRow {
+  final String tripId;
+  final String departureTime;
+  final String? stopHeadsign;
+  final String routeId;
+  final String serviceId;
+  final String? tripHeadsign;
+  final int? directionId;
+  final String routeShortName;
+  final String? routeColor;
+
+  DepartureRow({
+    required this.tripId,
+    required this.departureTime,
+    this.stopHeadsign,
+    required this.routeId,
+    required this.serviceId,
+    this.tripHeadsign,
+    this.directionId,
+    required this.routeShortName,
+    this.routeColor,
+  });
+}
+
 // ─── Database ─────────────────────────────────────────────────────
 
 @DriftDatabase(tables: [
@@ -262,6 +288,95 @@ class AppDatabase extends _$AppDatabase {
           ..where((st) => st.tripId.equals(tripId))
           ..orderBy([(st) => OrderingTerm.asc(st.stopSequence)]))
         .get();
+  }
+
+  /// Efficient single-query departure lookup using JOIN.
+  /// Returns departure data with trip and route info for a given stop.
+  /// If serviceIds is non-empty, filters to only those service IDs.
+  Future<List<DepartureRow>> getDeparturesForStop(
+    String stopId,
+    Set<String> serviceIds,
+  ) async {
+    String query;
+    List<Variable> vars;
+
+    if (serviceIds.isNotEmpty) {
+      final placeholders = List.filled(serviceIds.length, '?').join(', ');
+      query = '''
+        SELECT st.trip_id, st.departure_time, st.stop_headsign,
+               t.route_id, t.service_id, t.trip_headsign, t.direction_id,
+               r.route_short_name, r.route_color
+        FROM gtfs_stop_times st
+        INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+        INNER JOIN gtfs_routes r ON r.route_id = t.route_id
+        WHERE st.stop_id = ?
+          AND t.service_id IN ($placeholders)
+        ORDER BY st.departure_time
+      ''';
+      vars = [
+        Variable.withString(stopId),
+        ...serviceIds.map((id) => Variable.withString(id)),
+      ];
+    } else {
+      // Fallback: no calendar filtering, return all
+      query = '''
+        SELECT st.trip_id, st.departure_time, st.stop_headsign,
+               t.route_id, t.service_id, t.trip_headsign, t.direction_id,
+               r.route_short_name, r.route_color
+        FROM gtfs_stop_times st
+        INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+        INNER JOIN gtfs_routes r ON r.route_id = t.route_id
+        WHERE st.stop_id = ?
+        ORDER BY st.departure_time
+      ''';
+      vars = [Variable.withString(stopId)];
+    }
+
+    final results = await customSelect(query, variables: vars).get();
+
+    return results.map((row) => DepartureRow(
+      tripId: row.read<String>('trip_id'),
+      departureTime: row.read<String>('departure_time'),
+      stopHeadsign: row.readNullable<String>('stop_headsign'),
+      routeId: row.read<String>('route_id'),
+      serviceId: row.read<String>('service_id'),
+      tripHeadsign: row.readNullable<String>('trip_headsign'),
+      directionId: row.readNullable<int>('direction_id'),
+      routeShortName: row.read<String>('route_short_name'),
+      routeColor: row.readNullable<String>('route_color'),
+    )).toList();
+  }
+
+  /// Get all distinct service IDs from trips (used as fallback when
+  /// calendar data doesn't cover the current date).
+  Future<Set<String>> getAllServiceIds() async {
+    final results = await customSelect(
+      'SELECT DISTINCT service_id FROM gtfs_trips',
+    ).get();
+    return results.map((r) => r.read<String>('service_id')).toSet();
+  }
+
+  /// Get routes serving a stop efficiently via JOIN.
+  Future<List<GtfsRoute>> getRoutesForStopJoin(String stopId) async {
+    final results = await customSelect('''
+      SELECT DISTINCT r.*
+      FROM gtfs_stop_times st
+      INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+      INNER JOIN gtfs_routes r ON r.route_id = t.route_id
+      WHERE st.stop_id = ?
+      ORDER BY r.route_short_name
+    ''', variables: [Variable.withString(stopId)]).get();
+
+    return results.map((row) => GtfsRoute(
+      routeId: row.read<String>('route_id'),
+      agencyId: row.readNullable<String>('agency_id'),
+      routeShortName: row.read<String>('route_short_name'),
+      routeLongName: row.read<String>('route_long_name'),
+      routeType: row.read<int>('route_type'),
+      routeColor: row.readNullable<String>('route_color'),
+      routeTextColor: row.readNullable<String>('route_text_color'),
+      routeDesc: row.readNullable<String>('route_desc'),
+    )).toList();
   }
 
   // ─── Calendar queries ─────────────────────────────────────────

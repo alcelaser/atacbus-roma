@@ -8,14 +8,13 @@ import '../../domain/entities/departure.dart';
 import '../../domain/entities/route_entity.dart';
 import '../../domain/entities/vehicle.dart';
 import '../../domain/entities/service_alert.dart';
-import '../../domain/repositories/gtfs_repository.dart';
 import '../../domain/repositories/realtime_repository.dart';
 import '../../domain/usecases/search_stops.dart';
 import '../../domain/usecases/get_stop_departures.dart';
 import '../../domain/usecases/toggle_favorite.dart';
 import 'sync_provider.dart';
 
-final gtfsRepositoryProvider = Provider<GtfsRepository>((ref) {
+final gtfsRepositoryProvider = Provider<GtfsRepositoryImpl>((ref) {
   final db = ref.watch(databaseProvider);
   return GtfsRepositoryImpl(db);
 });

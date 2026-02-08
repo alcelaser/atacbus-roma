@@ -26,10 +26,16 @@ class DateTimeUtils {
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
   }
 
-  /// Get the current time as total seconds since midnight.
+  /// Get the current time as total seconds since midnight of the
+  /// service date. If it's before 4 AM, adds 86400 so the value
+  /// matches GTFS times like 25:30:00 from yesterday's service day.
   static int currentTimeAsSeconds() {
     final now = DateTime.now();
-    return now.hour * 3600 + now.minute * 60 + now.second;
+    final base = now.hour * 3600 + now.minute * 60 + now.second;
+    if (now.hour < 4) {
+      return base + 86400; // match GTFS after-midnight convention
+    }
+    return base;
   }
 
   /// Determine the GTFS "service date" for the current moment.

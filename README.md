@@ -20,7 +20,7 @@ The project follows **Clean Architecture** with three layers:
 
 **Navigation**: `go_router` with a `ShellRoute` wrapping the four main tabs (Home, Lines, Map, Alerts) in a `NavigationBar`. Stop detail, settings, and sync routes live outside the shell as full-screen pushes.
 
-**Database**: `drift` (SQLite) with 8 tables, 7 performance indexes, batch inserts (5000 rows/transaction), and code-generated data classes via `build_runner`.
+**Database**: `drift` (SQLite) with 8 tables, 7 performance indexes, batch inserts (5000 rows/transaction), and code-generated data classes via `build_runner`. In-memory caching in `GtfsRepositoryImpl` for all-stops, all-routes, and active service IDs (auto-refreshes per service date).
 
 ## Data Sources
 
@@ -115,7 +115,7 @@ lib/
       stop_detail/stop_detail_screen.dart  # Departure list, RT auto-refresh (30s), offline banner, favorite toggle, pull-to-refresh
       route_browser/route_browser_screen.dart  # Tabbed route list (All/Bus/Tram/Metro), LineBadge, tap to route detail
       route_detail/route_detail_screen.dart  # Route info + ordered stop list with timeline indicator, tap to stop detail
-      map/map_screen.dart            # (placeholder - Phase 6)
+      map/map_screen.dart            # flutter_map + OSM tiles, stop markers, live vehicle positions, user GPS location, bottom sheet stop info
       alerts/alerts_screen.dart      # (placeholder - Phase 7)
       settings/settings_screen.dart  # (placeholder - Phase 7)
       sync/sync_screen.dart          # Multi-stage progress bar, friendly error messages, retry
@@ -275,7 +275,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## Testing
 
-88 unit tests across five test files:
+176 unit tests across seven test files:
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -284,6 +284,8 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 | `test/unit/phase3_test.dart` | 13 | SearchStops use case, ToggleFavorite use case, Departure entity, RouteEntity type flags |
 | `test/unit/phase4_test.dart` | 20 | RT models, Vehicle/ServiceAlert entities, GetStopDepartures RT merge + fallback + sorting + 90-min window, MockRealtimeRepository |
 | `test/unit/phase5_test.dart` | 13 | Route type filtering (Bus/Tram/Metro), GetRouteDetails use case, GetRoutesForStop use case, RouteEntity properties, Stop entity |
+| `test/unit/phase6_test.dart` | 10 | Stop coordinates, Vehicle map filtering, nearby stops distance calculation, bearing-to-radians conversion |
+| `test/unit/departure_comprehensive_test.dart` | 78 | GTFS time edge cases, service date logic, Departure entity, DepartureRow mapping, GetStopDepartures (time window, RT merge, sorting, edge cases), calendar service ID resolution, after-midnight fix verification |
 
 Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` implementing the abstract interfaces (no external mocking library needed for use case tests).
 
@@ -296,10 +298,10 @@ Mock strategy: hand-rolled `MockGtfsRepository` and `MockRealtimeRepository` imp
 | v0.0.3 | `v0.0.3` | Stop Search + Timetable: domain layer, search, scheduled departures, home + stop detail screens |
 | v0.0.4 | `v0.0.4` | Real-Time Integration: GTFS-RT protobuf parsing, delay overlay on departures, 30s auto-refresh, connectivity detection, offline banner |
 | v0.0.5 | `v0.0.5` | Route Browser + Favorites: tabbed route list (Bus/Tram/Metro), route detail with timeline stop list, reactive favorites with live departure countdown |
+| v0.0.6 | `v0.0.6` | Map View + Departure Fix + Caching: flutter_map + OSM tiles, stop markers with bottom sheet, live vehicle positions (30s refresh), user GPS location, bearing rotation; fixed departure times (JOIN query, calendar fallback, after-midnight fix); in-memory caching for stops/routes/service IDs; 78 new comprehensive tests |
 
 ## Roadmap
 
-- **v0.0.6** - Map View: OpenStreetMap with clustered stop markers, live bus positions, route polylines, nearby stops (GPS)
 - **v0.0.7** - Alerts + Polish: service disruption cards, settings (theme toggle, re-sync), loading skeletons, empty states
 - **v0.1.0** - MVP: full test suite, QA pass, first stable release
 
