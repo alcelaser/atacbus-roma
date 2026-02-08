@@ -76,6 +76,9 @@ final toggleFavoriteProvider = Provider<ToggleFavorite>((ref) {
 // Search query state
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
+// Route search query state (for route browser)
+final routeSearchQueryProvider = StateProvider<String>((ref) => '');
+
 // Search results
 final searchResultsProvider = FutureProvider<List<Stop>>((ref) async {
   final query = ref.watch(searchQueryProvider);

@@ -213,27 +213,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           );
         }
         return Column(
-          children: nearbyStops.map((nearby) {
-            final distanceStr = nearby.distanceMeters < 1000
-                ? '${nearby.distanceMeters.round()} m'
-                : '${(nearby.distanceMeters / 1000).toStringAsFixed(1)} km';
-            return Card(
-              child: ListTile(
-                leading: const Icon(Icons.near_me),
-                title: Text(
-                  nearby.stop.stopName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(distanceStr),
-                trailing: Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurface.withOpacity(0.3),
-                ),
-                onTap: () => context.push('/stop/${nearby.stop.stopId}'),
-              ),
-            );
-          }).toList(),
+          children: nearbyStops
+              .map((nearby) => _NearbyStopCard(nearbyStop: nearby))
+              .toList(),
         );
       },
       loading: () => const Card(
@@ -415,6 +397,170 @@ class _FavoriteStopCardState extends ConsumerState<_FavoriteStopCard> {
         ),
       ),
       error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _NearbyStopCard extends ConsumerStatefulWidget {
+  const _NearbyStopCard({required this.nearbyStop});
+
+  final NearbyStop nearbyStop;
+
+  @override
+  ConsumerState<_NearbyStopCard> createState() => _NearbyStopCardState();
+}
+
+class _NearbyStopCardState extends ConsumerState<_NearbyStopCard> {
+  Timer? _countdownTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _countdownTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  String _formatCountdown(int secondsUntil) {
+    if (secondsUntil <= 0) return 'Now';
+    final minutes = secondsUntil ~/ 60;
+    if (minutes == 0) return '<1 min';
+    return '$minutes min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final nearby = widget.nearbyStop;
+    final depsAsync = ref.watch(stopDeparturesProvider(nearby.stop.stopId));
+
+    final distanceStr = nearby.distanceMeters < 1000
+        ? '${nearby.distanceMeters.round()} m'
+        : '${(nearby.distanceMeters / 1000).toStringAsFixed(1)} km';
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/stop/${nearby.stop.stopId}'),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Distance badge as leading element
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      distanceStr,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      nearby.stop.stopName,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurface.withOpacity(0.3),
+                  ),
+                ],
+              ),
+              // Next 2 departures
+              depsAsync.when(
+                data: (deps) {
+                  if (deps.isEmpty) return const SizedBox.shrink();
+                  final now = DateTimeUtils.currentTimeAsSeconds();
+                  final upcoming = deps.take(2).toList();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: upcoming.map((dep) {
+                        final secsUntil = dep.effectiveSeconds - now;
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            LineBadge(
+                              lineNumber: dep.routeShortName,
+                              color: dep.routeColor,
+                              fontSize: 10,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatCountdown(secsUntil),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: secsUntil <= 120
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.primary,
+                              ),
+                            ),
+                            if (dep.isRealtime) ...[
+                              const SizedBox(width: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 3, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: const Text(
+                                  'LIVE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 7,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  );
+                },
+                loading: () => const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../../domain/entities/stop.dart';
 import '../../../domain/entities/route_entity.dart';
+import '../../../domain/entities/service_alert.dart';
 import '../../providers/gtfs_providers.dart';
 import '../../widgets/line_badge.dart';
 
@@ -88,6 +89,8 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen> {
       ),
       body: Column(
         children: [
+          // Route alerts
+          _buildRouteAlerts(theme, l10n),
           // Direction toggle
           _buildDirectionToggle(directionsAsync, theme, l10n),
           // Stop list
@@ -105,6 +108,67 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRouteAlerts(ThemeData theme, AppLocalizations l10n) {
+    final alertsAsync = ref.watch(serviceAlertsProvider);
+
+    return alertsAsync.when(
+      data: (allAlerts) {
+        final routeAlerts = allAlerts
+            .where((a) => a.routeIds.contains(widget.routeId))
+            .toList();
+        if (routeAlerts.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Card(
+            color: theme.colorScheme.errorContainer,
+            child: ExpansionTile(
+              leading: Icon(
+                Icons.warning_amber,
+                color: theme.colorScheme.error,
+              ),
+              title: Text(
+                l10n.serviceAlerts,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+              ),
+              subtitle: Text(
+                '${routeAlerts.length} ${routeAlerts.length == 1 ? l10n.activeAlert : l10n.activeAlerts}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+              ),
+              initiallyExpanded: true,
+              children: routeAlerts
+                  .map((alert) => ListTile(
+                        title: Text(
+                          alert.headerText ?? l10n.serviceAlerts,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: alert.descriptionText != null &&
+                                alert.descriptionText!.isNotEmpty
+                            ? Text(
+                                alert.descriptionText!,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
+                        dense: true,
+                      ))
+                  .toList(),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 

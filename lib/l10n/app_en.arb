@@ -111,5 +111,12 @@
         "type": "String"
       }
     }
-  }
+  },
+  "searchLines": "Search lines...",
+  "regularBus": "Regular Bus",
+  "nightBus": "Night Bus",
+  "expressBus": "Express Bus",
+  "suburbanBus": "Suburban Bus",
+  "activeAlert": "active alert",
+  "activeAlerts": "active alerts"
 }
