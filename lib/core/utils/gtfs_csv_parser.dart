@@ -7,7 +7,7 @@ class GtfsCsvParser {
   /// The first row is treated as the header row.
   /// Returns a list of Map<String, String> where each map represents a row.
   static List<Map<String, String>> parse(String csvContent) {
-    final converter = const CsvToListConverter(
+    const converter = CsvToListConverter(
       shouldParseNumbers: false,
       allowInvalid: true,
       eol: '\n',

@@ -149,8 +149,10 @@ void main() {
       ];
 
       stops.sort((a, b) {
-        final dA = DistanceUtils.haversineDistance(userLat, userLon, a.stopLat, a.stopLon);
-        final dB = DistanceUtils.haversineDistance(userLat, userLon, b.stopLat, b.stopLon);
+        final dA = DistanceUtils.haversineDistance(
+            userLat, userLon, a.stopLat, a.stopLon);
+        final dB = DistanceUtils.haversineDistance(
+            userLat, userLon, b.stopLat, b.stopLon);
         return dA.compareTo(dB);
       });
 
@@ -163,19 +165,19 @@ void main() {
   group('Map data providers', () {
     test('vehicle bearing converts to radians for rotation', () {
       const bearingDegrees = 90.0;
-      final radians = bearingDegrees * (3.14159 / 180);
+      const radians = bearingDegrees * (3.14159 / 180);
       expect(radians, closeTo(1.5708, 0.001));
     });
 
     test('bearing 0 means pointing north (no rotation)', () {
       const bearingDegrees = 0.0;
-      final radians = bearingDegrees * (3.14159 / 180);
+      const radians = bearingDegrees * (3.14159 / 180);
       expect(radians, closeTo(0.0, 0.001));
     });
 
     test('bearing 360 means pointing north (full rotation)', () {
       const bearingDegrees = 360.0;
-      final radians = bearingDegrees * (3.14159 / 180);
+      const radians = bearingDegrees * (3.14159 / 180);
       expect(radians, closeTo(6.2832, 0.001));
     });
   });

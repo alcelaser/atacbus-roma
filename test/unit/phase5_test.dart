@@ -27,8 +27,15 @@ class MockGtfsRepositoryForRoutes implements GtfsRepository {
   Future<RouteEntity?> getRouteById(String routeId) async =>
       routes.where((r) => r.routeId == routeId).firstOrNull;
   @override
-  Future<List<Stop>> getStopsForRoute(String routeId) async =>
+  Future<List<Stop>> getStopsForRoute(String routeId,
+          {int? directionId}) async =>
       routeStops[routeId] ?? [];
+  @override
+  Future<List<int>> getDirectionsForRoute(String routeId) async => [0, 1];
+  @override
+  Future<String?> getHeadsignForDirection(
+          String routeId, int directionId) async =>
+      null;
   @override
   Future<List<RouteEntity>> getRoutesForStop(String stopId) async =>
       stopRoutes[stopId] ?? [];

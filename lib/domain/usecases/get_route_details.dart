@@ -11,7 +11,7 @@ class GetRouteDetails {
     return _repository.getRouteById(routeId);
   }
 
-  Future<List<Stop>> getStopsForRoute(String routeId) {
-    return _repository.getStopsForRoute(routeId);
+  Future<List<Stop>> getStopsForRoute(String routeId, {int? directionId}) {
+    return _repository.getStopsForRoute(routeId, directionId: directionId);
   }
 }

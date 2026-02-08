@@ -59,5 +59,15 @@
   "refresh": "Aggiorna",
   "noResults": "Nessun risultato trovato",
   "locationPermissionDenied": "Permesso posizione negato",
-  "locationServiceDisabled": "Servizi di localizzazione disabilitati"
+  "locationServiceDisabled": "Servizi di localizzazione disabilitati",
+  "outbound": "Andata",
+  "inbound": "Ritorno",
+  "metersAway": "{distance} m di distanza",
+  "@metersAway": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  }
 }

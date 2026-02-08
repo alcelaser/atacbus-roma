@@ -92,7 +92,15 @@ class MockGtfsRepo implements GtfsRepository {
   @override
   Future<List<RouteEntity>> getRoutesForStop(String stopId) async => [];
   @override
-  Future<List<Stop>> getStopsForRoute(String routeId) async => [];
+  Future<List<Stop>> getStopsForRoute(String routeId,
+          {int? directionId}) async =>
+      [];
+  @override
+  Future<List<int>> getDirectionsForRoute(String routeId) async => [];
+  @override
+  Future<String?> getHeadsignForDirection(
+          String routeId, int directionId) async =>
+      null;
   @override
   Future<bool> isFavorite(String stopId) async => _isFavorite;
   @override
@@ -248,7 +256,7 @@ void main() {
     });
 
     test('BOM stripping on header line', () {
-      final headerWithBom = '\uFEFFtrip_id,arrival_time,departure_time';
+      const headerWithBom = '\uFEFFtrip_id,arrival_time,departure_time';
       var headerLine = headerWithBom;
       if (headerLine.isNotEmpty && headerLine.codeUnitAt(0) == 0xFEFF) {
         headerLine = headerLine.substring(1);
@@ -259,7 +267,7 @@ void main() {
     });
 
     test('BOM + quoted headers both handled', () {
-      final headerLine = '\uFEFF"trip_id","arrival_time","departure_time"';
+      const headerLine = '\uFEFF"trip_id","arrival_time","departure_time"';
       var cleaned = headerLine;
       if (cleaned.isNotEmpty && cleaned.codeUnitAt(0) == 0xFEFF) {
         cleaned = cleaned.substring(1);
@@ -627,14 +635,14 @@ void main() {
 
   group('BUG FIX: Sync redirect logic', () {
     test('AsyncData(false) should trigger redirect', () {
-      final asyncVal = AsyncValue.data(false);
+      const asyncVal = AsyncValue.data(false);
       final shouldRedirect =
           !asyncVal.isLoading && asyncVal.valueOrNull == false;
       expect(shouldRedirect, true);
     });
 
     test('AsyncData(true) should NOT trigger redirect', () {
-      final asyncVal = AsyncValue.data(true);
+      const asyncVal = AsyncValue.data(true);
       final shouldRedirect =
           !asyncVal.isLoading && asyncVal.valueOrNull == false;
       expect(shouldRedirect, false);
@@ -660,16 +668,16 @@ void main() {
       expect(loading.isLoading, true);
       expect(!loading.isLoading && loading.valueOrNull == false, false);
 
-      final data = AsyncValue.data(false);
+      const data = AsyncValue.data(false);
       expect(data.isLoading, false);
       expect(!data.isLoading && data.valueOrNull == false, true);
 
-      final dataTrue = AsyncValue.data(true);
+      const dataTrue = AsyncValue.data(true);
       expect(!dataTrue.isLoading && dataTrue.valueOrNull == false, false);
     });
 
     test('AsyncError with exception does not crash redirect check', () {
-      final error = AsyncValue<bool>.error('network_error', StackTrace.empty);
+      const error = AsyncValue<bool>.error('network_error', StackTrace.empty);
       expect(error.isLoading, false);
       expect(error.valueOrNull, null);
       expect(!error.isLoading && error.valueOrNull == false, false);

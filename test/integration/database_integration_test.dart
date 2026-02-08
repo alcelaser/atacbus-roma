@@ -11,6 +11,8 @@ import 'package:atacbus_roma/domain/entities/service_alert.dart';
 import 'package:atacbus_roma/domain/repositories/realtime_repository.dart';
 import 'package:atacbus_roma/core/utils/date_time_utils.dart';
 import 'package:atacbus_roma/core/utils/gtfs_csv_parser.dart';
+import 'package:atacbus_roma/core/utils/distance_utils.dart';
+import 'package:atacbus_roma/domain/entities/stop.dart';
 
 // ─── RT mock for use case tests ─────────────────────────────
 class MockRealtimeRepo implements RealtimeRepository {
@@ -1837,6 +1839,303 @@ void main() {
       expect(await db.countRoutes(), 1);
       expect(await db.countTrips(), 3);
       expect(await db.countStopTimes(), 1);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // v0.0.11: Direction filtering + nearby stops
+  // ═══════════════════════════════════════════════════════════════════
+
+  group('Database: direction filtering', () {
+    late AppDatabase db;
+
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+    });
+
+    tearDown(() => db.close());
+
+    test('getStopsForRouteJoin with directionId filters correctly', () async {
+      await db.insertStops([
+        GtfsStopsCompanion.insert(
+            stopId: 'A', stopName: 'Stop A', stopLat: 41.9, stopLon: 12.5),
+        GtfsStopsCompanion.insert(
+            stopId: 'B', stopName: 'Stop B', stopLat: 41.91, stopLon: 12.51),
+        GtfsStopsCompanion.insert(
+            stopId: 'C', stopName: 'Stop C', stopLat: 41.92, stopLon: 12.52),
+      ]);
+      await db.insertRoutes([
+        GtfsRoutesCompanion.insert(
+            routeId: 'R1',
+            routeShortName: '64',
+            routeLongName: 'Route 64',
+            routeType: 3),
+      ]);
+      await db.insertTrips([
+        GtfsTripsCompanion.insert(
+            tripId: 'T_OUT',
+            routeId: 'R1',
+            serviceId: 'SVC1',
+            directionId: const Value(0)),
+        GtfsTripsCompanion.insert(
+            tripId: 'T_IN',
+            routeId: 'R1',
+            serviceId: 'SVC1',
+            directionId: const Value(1)),
+      ]);
+      await db.insertStopTimes([
+        // Outbound: A -> B
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T_OUT',
+            arrivalTime: '08:00:00',
+            departureTime: '08:00:00',
+            stopId: 'A',
+            stopSequence: 1),
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T_OUT',
+            arrivalTime: '08:10:00',
+            departureTime: '08:10:00',
+            stopId: 'B',
+            stopSequence: 2),
+        // Inbound: C -> A
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T_IN',
+            arrivalTime: '09:00:00',
+            departureTime: '09:00:00',
+            stopId: 'C',
+            stopSequence: 1),
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T_IN',
+            arrivalTime: '09:10:00',
+            departureTime: '09:10:00',
+            stopId: 'A',
+            stopSequence: 2),
+      ]);
+
+      // Without direction filter -> picks longest trip (both have 2 stops,
+      // so picks first found)
+      final allStops = await db.getStopsForRouteJoin('R1');
+      expect(allStops.length, 2);
+
+      // Direction 0 (outbound): A -> B
+      final outbound = await db.getStopsForRouteJoin('R1', directionId: 0);
+      expect(outbound.length, 2);
+      expect(outbound[0].stopId, 'A');
+      expect(outbound[1].stopId, 'B');
+
+      // Direction 1 (inbound): C -> A
+      final inbound = await db.getStopsForRouteJoin('R1', directionId: 1);
+      expect(inbound.length, 2);
+      expect(inbound[0].stopId, 'C');
+      expect(inbound[1].stopId, 'A');
+    });
+
+    test('getDirectionsForRoute returns available directions', () async {
+      await db.insertTrips([
+        GtfsTripsCompanion.insert(
+            tripId: 'T1',
+            routeId: 'R1',
+            serviceId: 'S1',
+            directionId: const Value(0)),
+        GtfsTripsCompanion.insert(
+            tripId: 'T2',
+            routeId: 'R1',
+            serviceId: 'S1',
+            directionId: const Value(1)),
+        GtfsTripsCompanion.insert(
+            tripId: 'T3',
+            routeId: 'R1',
+            serviceId: 'S1',
+            directionId: const Value(0)),
+      ]);
+
+      final directions = await db.getDirectionsForRoute('R1');
+      expect(directions, [0, 1]);
+    });
+
+    test('getDirectionsForRoute returns empty for route without directions',
+        () async {
+      await db.insertTrips([
+        GtfsTripsCompanion.insert(tripId: 'T1', routeId: 'R2', serviceId: 'S1'),
+      ]);
+
+      final directions = await db.getDirectionsForRoute('R2');
+      expect(directions, isEmpty);
+    });
+
+    test('getHeadsignForDirection returns headsign', () async {
+      await db.insertTrips([
+        GtfsTripsCompanion.insert(
+            tripId: 'T1',
+            routeId: 'R1',
+            serviceId: 'S1',
+            directionId: const Value(0),
+            tripHeadsign: const Value('Termini')),
+        GtfsTripsCompanion.insert(
+            tripId: 'T2',
+            routeId: 'R1',
+            serviceId: 'S1',
+            directionId: const Value(1),
+            tripHeadsign: const Value('San Pietro')),
+      ]);
+
+      final h0 = await db.getHeadsignForDirection('R1', 0);
+      expect(h0, 'Termini');
+
+      final h1 = await db.getHeadsignForDirection('R1', 1);
+      expect(h1, 'San Pietro');
+    });
+  });
+
+  group('DistanceUtils: nearby stops filtering', () {
+    test('haversine distance between Rome points is reasonable', () {
+      // Termini station to Colosseum (~1.1 km)
+      final distance = DistanceUtils.haversineDistance(
+        41.9009, 12.5016, // Termini
+        41.8902, 12.4923, // Colosseum
+      );
+      expect(distance, greaterThan(500));
+      expect(distance, lessThan(2000));
+    });
+
+    test('filtering stops within 1 km radius', () {
+      final userLat = 41.9009;
+      final userLon = 12.5016;
+      final stops = [
+        const Stop(
+            stopId: 'near',
+            stopName: 'Near',
+            stopLat: 41.9015,
+            stopLon: 12.5020), // ~80m
+        const Stop(
+            stopId: 'mid',
+            stopName: 'Mid',
+            stopLat: 41.9050,
+            stopLon: 12.5080), // ~600m
+        const Stop(
+            stopId: 'far',
+            stopName: 'Far',
+            stopLat: 41.8800,
+            stopLon: 12.4700), // ~3.5km
+      ];
+
+      final within1km = stops.where((s) {
+        final d = DistanceUtils.haversineDistance(
+          userLat,
+          userLon,
+          s.stopLat,
+          s.stopLon,
+        );
+        return d <= 1000;
+      }).toList();
+
+      expect(within1km.length, 2);
+      expect(within1km.map((s) => s.stopId), containsAll(['near', 'mid']));
+    });
+
+    test('nearby stops are sorted by distance', () {
+      final userLat = 41.9009;
+      final userLon = 12.5016;
+      final stops = [
+        const Stop(
+            stopId: 'mid', stopName: 'Mid', stopLat: 41.9050, stopLon: 12.5080),
+        const Stop(
+            stopId: 'near',
+            stopName: 'Near',
+            stopLat: 41.9015,
+            stopLon: 12.5020),
+      ];
+
+      final withDist = stops.map((s) {
+        final d = DistanceUtils.haversineDistance(
+          userLat,
+          userLon,
+          s.stopLat,
+          s.stopLon,
+        );
+        return (stop: s, distance: d);
+      }).toList()
+        ..sort((a, b) => a.distance.compareTo(b.distance));
+
+      expect(withDist.first.stop.stopId, 'near');
+      expect(withDist.last.stop.stopId, 'mid');
+    });
+  });
+
+  group('GtfsRepositoryImpl: direction support', () {
+    late AppDatabase db;
+    late GtfsRepositoryImpl repo;
+
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+      repo = GtfsRepositoryImpl(db);
+    });
+
+    tearDown(() => db.close());
+
+    test('getStopsForRoute with directionId filters via repository', () async {
+      await db.insertStops([
+        GtfsStopsCompanion.insert(
+            stopId: 'X', stopName: 'Stop X', stopLat: 41.9, stopLon: 12.5),
+        GtfsStopsCompanion.insert(
+            stopId: 'Y', stopName: 'Stop Y', stopLat: 41.91, stopLon: 12.51),
+      ]);
+      await db.insertRoutes([
+        GtfsRoutesCompanion.insert(
+            routeId: 'R1',
+            routeShortName: '1',
+            routeLongName: 'Route 1',
+            routeType: 3),
+      ]);
+      await db.insertTrips([
+        GtfsTripsCompanion.insert(
+            tripId: 'T0',
+            routeId: 'R1',
+            serviceId: 'S1',
+            directionId: const Value(0)),
+        GtfsTripsCompanion.insert(
+            tripId: 'T1',
+            routeId: 'R1',
+            serviceId: 'S1',
+            directionId: const Value(1)),
+      ]);
+      await db.insertStopTimes([
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T0',
+            arrivalTime: '08:00:00',
+            departureTime: '08:00:00',
+            stopId: 'X',
+            stopSequence: 1),
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T0',
+            arrivalTime: '08:10:00',
+            departureTime: '08:10:00',
+            stopId: 'Y',
+            stopSequence: 2),
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T1',
+            arrivalTime: '09:00:00',
+            departureTime: '09:00:00',
+            stopId: 'Y',
+            stopSequence: 1),
+        GtfsStopTimesCompanion.insert(
+            tripId: 'T1',
+            arrivalTime: '09:10:00',
+            departureTime: '09:10:00',
+            stopId: 'X',
+            stopSequence: 2),
+      ]);
+
+      final dir0 = await repo.getStopsForRoute('R1', directionId: 0);
+      expect(dir0.length, 2);
+      expect(dir0[0].stopId, 'X');
+
+      final dir1 = await repo.getStopsForRoute('R1', directionId: 1);
+      expect(dir1.length, 2);
+      expect(dir1[0].stopId, 'Y');
+
+      final directions = await repo.getDirectionsForRoute('R1');
+      expect(directions, [0, 1]);
     });
   });
 }

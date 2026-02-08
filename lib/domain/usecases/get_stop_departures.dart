@@ -24,7 +24,7 @@ class GetStopDepartures {
     // 3. Try to overlay RT delays
     if (_realtimeRepository != null) {
       try {
-        final delays = await _realtimeRepository!.getTripDelays();
+        final delays = await _realtimeRepository.getTripDelays();
         final merged = upcoming.map((dep) {
           final delay = delays[dep.tripId];
           if (delay != null) {

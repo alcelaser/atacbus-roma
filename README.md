@@ -112,10 +112,10 @@ lib/
       gtfs_providers.dart            # gtfsRepositoryProvider, realtimeRepositoryProvider, connectivityProvider, isOnlineProvider, searchResultsProvider, stopDeparturesProvider, favoriteStopIdsProvider, ...
       theme_provider.dart            # themeModeProvider (StateNotifier), lastSyncDateProvider, persists theme to SharedPreferences
     screens/
-      home/home_screen.dart          # Search bar (live results), favorites with live departure countdown + LIVE badges
+      home/home_screen.dart          # Search bar (live results), favorites with live departure countdown + LIVE badges, nearby stops within 1 km (GPS)
       stop_detail/stop_detail_screen.dart  # Departure list, RT auto-refresh (30s), offline banner, favorite toggle, pull-to-refresh
       route_browser/route_browser_screen.dart  # Tabbed route list (All/Bus/Tram/Metro), LineBadge, tap to route detail
-      route_detail/route_detail_screen.dart  # Route info + ordered stop list with timeline indicator, tap to stop detail
+      route_detail/route_detail_screen.dart  # Route info + ordered stop list with timeline indicator, direction toggle (outbound/inbound), tap to stop detail
       map/map_screen.dart            # flutter_map + OSM tiles, stop markers, live vehicle positions, user GPS location, bottom sheet stop info
       alerts/alerts_screen.dart      # Service alert cards with route/stop chips, offline banner, pull-to-refresh
       settings/settings_screen.dart  # Theme toggle (system/light/dark), re-sync with confirmation, last sync date, about
@@ -294,7 +294,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## Testing
 
-339 tests across nine test files (249 unit + 90 integration):
+352 tests across nine test files (249 unit + 103 integration):
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -306,7 +306,7 @@ The release APK is output to `build/app/outputs/flutter-apk/app-release.apk`.
 | `test/unit/phase6_test.dart` | 10 | Stop coordinates, Vehicle map filtering, nearby stops distance calculation, bearing-to-radians conversion |
 | `test/unit/departure_comprehensive_test.dart` | 78 | GTFS time edge cases, service date logic, Departure entity, DepartureRow mapping, GetStopDepartures (time window, RT merge, sorting, edge cases), calendar service ID resolution, after-midnight fix verification |
 | `test/unit/phase7_test.dart` | 20 | ServiceAlert entity, ThemeMode persistence logic, AppConstants, vehicle display/filtering, alert filtering by route/stop/time period |
-| `test/integration/database_integration_test.dart` | 90 | **Real in-memory SQLite** (no mocks): Stop/Route/Trip/StopTime/Calendar/Favorite CRUD, JOIN queries, `GtfsRepositoryImpl` integration (search, caching, calendar resolution with exceptions), `GetStopDepartures` use case with real DB + RT mock merge, `GtfsCsvParser` edge cases (BOM, quotes, CRLF, escaped quotes), full E2E pipeline (CSV → parse → DB → repository → use case), `DateTimeUtils` comprehensive edge tests, `Departure` entity + `DepartureRow` mapping resilience |
+| `test/integration/database_integration_test.dart` | 103 | **Real in-memory SQLite** (no mocks): Stop/Route/Trip/StopTime/Calendar/Favorite CRUD, JOIN queries, `GtfsRepositoryImpl` integration (search, caching, calendar resolution with exceptions), `GetStopDepartures` use case with real DB + RT mock merge, `GtfsCsvParser` edge cases (BOM, quotes, CRLF, escaped quotes), full E2E pipeline (CSV → parse → DB → repository → use case), `DateTimeUtils` comprehensive edge tests, `Departure` entity + `DepartureRow` mapping resilience, direction filtering (outbound/inbound), nearby stops distance filtering |
 
 Testing strategy: unit tests use hand-rolled mock repositories implementing abstract interfaces. Integration tests use real in-memory SQLite databases via `NativeDatabase.memory()` to validate the full stack without mocks.
 
@@ -324,6 +324,7 @@ Testing strategy: unit tests use hand-rolled mock repositories implementing abst
 | v0.0.8 | `v0.0.8` | BOM fix + CSV parser hardening: fixed UTF-8 BOM stripping in GtfsCsvParser causing header mismatch during GTFS import |
 | v0.0.9 | `v0.0.9` | Database hardening + real integration tests: schema migration (v1→v2), composite `(stop_id, departure_time)` index, N+1 query elimination in `getStopsForRoute` (single JOIN), SQL injection prevention in LIKE queries, empty PK validation in all 7 CSV parsers, cache invalidation after sync, 90 real-DB integration tests using in-memory SQLite |
 | v0.0.10 | `v0.0.10` | Rebrand to BUS - Roma: app renamed from ATAC Bus Roma to BUS - Roma across all platforms (Android, iOS, web, Linux, Windows), custom app icon, version bump to 0.0.10 |
+| v0.0.11 | `v0.0.11` | Nearby stops + direction toggle: home screen shows closest stops within 1 km using GPS, route detail screen adds direction toggle (outbound/inbound) with headsign labels, updated nearby radius to 1 km |
 
 ## Roadmap
 

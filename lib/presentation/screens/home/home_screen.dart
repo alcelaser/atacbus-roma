@@ -177,7 +177,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Text('Error: $e'),
         ),
+        const SizedBox(height: 24),
+
+        // Nearby stops section
+        Text(
+          l10n.nearbyStops,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildNearbyStops(l10n, theme),
       ],
+    );
+  }
+
+  Widget _buildNearbyStops(AppLocalizations l10n, ThemeData theme) {
+    final nearbyAsync = ref.watch(nearbyStopsProvider);
+
+    return nearbyAsync.when(
+      data: (nearbyStops) {
+        if (nearbyStops.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Text(
+                  l10n.noNearbyStops,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return Column(
+          children: nearbyStops.map((nearby) {
+            final distanceStr = nearby.distanceMeters < 1000
+                ? '${nearby.distanceMeters.round()} m'
+                : '${(nearby.distanceMeters / 1000).toStringAsFixed(1)} km';
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.near_me),
+                title: Text(
+                  nearby.stop.stopName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(distanceStr),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurface.withOpacity(0.3),
+                ),
+                onTap: () => context.push('/stop/${nearby.stop.stopId}'),
+              ),
+            );
+          }).toList(),
+        );
+      },
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (e, _) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: Text(
+              l10n.locationPermissionDenied,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.5),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

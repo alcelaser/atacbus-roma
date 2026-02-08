@@ -4,7 +4,6 @@ import 'package:atacbus_roma/domain/entities/route_entity.dart';
 import 'package:atacbus_roma/domain/entities/departure.dart';
 import 'package:atacbus_roma/domain/usecases/search_stops.dart';
 import 'package:atacbus_roma/domain/usecases/toggle_favorite.dart';
-import 'package:atacbus_roma/domain/usecases/get_stop_departures.dart';
 import 'package:atacbus_roma/domain/repositories/gtfs_repository.dart';
 
 // Simple mock repository for testing use cases
@@ -54,7 +53,17 @@ class MockGtfsRepository implements GtfsRepository {
       departures;
 
   @override
-  Future<List<Stop>> getStopsForRoute(String routeId) async => [];
+  Future<List<Stop>> getStopsForRoute(String routeId,
+          {int? directionId}) async =>
+      [];
+
+  @override
+  Future<List<int>> getDirectionsForRoute(String routeId) async => [];
+
+  @override
+  Future<String?> getHeadsignForDirection(
+          String routeId, int directionId) async =>
+      null;
 
   @override
   Future<List<RouteEntity>> getRoutesForStop(String stopId) async => [];

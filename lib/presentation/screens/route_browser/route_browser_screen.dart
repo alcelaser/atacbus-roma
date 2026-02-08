@@ -26,7 +26,7 @@ class RouteBrowserScreen extends ConsumerWidget {
             ],
           ),
         ),
-        body: TabBarView(
+        body: const TabBarView(
           children: [
             _RouteList(typeFilter: null),
             _RouteList(typeFilter: 3), // Bus

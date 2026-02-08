@@ -4,7 +4,6 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../providers/sync_provider.dart';
 import '../../providers/theme_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {

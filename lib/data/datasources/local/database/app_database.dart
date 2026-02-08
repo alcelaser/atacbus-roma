@@ -213,31 +213,39 @@ class AppDatabase extends _$AppDatabase {
   // ─── Batch inserts ────────────────────────────────────────────
 
   Future<void> insertStops(List<GtfsStopsCompanion> rows) async {
-    await batch((b) => b.insertAll(gtfsStops, rows, mode: InsertMode.insertOrReplace));
+    await batch(
+        (b) => b.insertAll(gtfsStops, rows, mode: InsertMode.insertOrReplace));
   }
 
   Future<void> insertRoutes(List<GtfsRoutesCompanion> rows) async {
-    await batch((b) => b.insertAll(gtfsRoutes, rows, mode: InsertMode.insertOrReplace));
+    await batch(
+        (b) => b.insertAll(gtfsRoutes, rows, mode: InsertMode.insertOrReplace));
   }
 
   Future<void> insertTrips(List<GtfsTripsCompanion> rows) async {
-    await batch((b) => b.insertAll(gtfsTrips, rows, mode: InsertMode.insertOrReplace));
+    await batch(
+        (b) => b.insertAll(gtfsTrips, rows, mode: InsertMode.insertOrReplace));
   }
 
   Future<void> insertStopTimes(List<GtfsStopTimesCompanion> rows) async {
-    await batch((b) => b.insertAll(gtfsStopTimes, rows, mode: InsertMode.insertOrReplace));
+    await batch((b) =>
+        b.insertAll(gtfsStopTimes, rows, mode: InsertMode.insertOrReplace));
   }
 
   Future<void> insertCalendar(List<GtfsCalendarCompanion> rows) async {
-    await batch((b) => b.insertAll(gtfsCalendar, rows, mode: InsertMode.insertOrReplace));
+    await batch((b) =>
+        b.insertAll(gtfsCalendar, rows, mode: InsertMode.insertOrReplace));
   }
 
-  Future<void> insertCalendarDates(List<GtfsCalendarDatesCompanion> rows) async {
-    await batch((b) => b.insertAll(gtfsCalendarDates, rows, mode: InsertMode.insertOrReplace));
+  Future<void> insertCalendarDates(
+      List<GtfsCalendarDatesCompanion> rows) async {
+    await batch((b) =>
+        b.insertAll(gtfsCalendarDates, rows, mode: InsertMode.insertOrReplace));
   }
 
   Future<void> insertShapes(List<GtfsShapesCompanion> rows) async {
-    await batch((b) => b.insertAll(gtfsShapes, rows, mode: InsertMode.insertOrReplace));
+    await batch(
+        (b) => b.insertAll(gtfsShapes, rows, mode: InsertMode.insertOrReplace));
   }
 
   // ─── Stop queries ─────────────────────────────────────────────
@@ -354,17 +362,19 @@ class AppDatabase extends _$AppDatabase {
 
     final results = await customSelect(query, variables: vars).get();
 
-    return results.map((row) => DepartureRow(
-      tripId: row.read<String>('trip_id'),
-      departureTime: row.read<String>('departure_time'),
-      stopHeadsign: row.readNullable<String>('stop_headsign'),
-      routeId: row.read<String>('route_id'),
-      serviceId: row.read<String>('service_id'),
-      tripHeadsign: row.readNullable<String>('trip_headsign'),
-      directionId: row.readNullable<int>('direction_id'),
-      routeShortName: row.read<String>('route_short_name'),
-      routeColor: row.readNullable<String>('route_color'),
-    )).toList();
+    return results
+        .map((row) => DepartureRow(
+              tripId: row.read<String>('trip_id'),
+              departureTime: row.read<String>('departure_time'),
+              stopHeadsign: row.readNullable<String>('stop_headsign'),
+              routeId: row.read<String>('route_id'),
+              serviceId: row.read<String>('service_id'),
+              tripHeadsign: row.readNullable<String>('trip_headsign'),
+              directionId: row.readNullable<int>('direction_id'),
+              routeShortName: row.read<String>('route_short_name'),
+              routeColor: row.readNullable<String>('route_color'),
+            ))
+        .toList();
   }
 
   /// Get all distinct service IDs from trips (used as fallback when
@@ -387,32 +397,55 @@ class AppDatabase extends _$AppDatabase {
       ORDER BY r.route_short_name
     ''', variables: [Variable.withString(stopId)]).get();
 
-    return results.map((row) => GtfsRoute(
-      routeId: row.read<String>('route_id'),
-      agencyId: row.readNullable<String>('agency_id'),
-      routeShortName: row.read<String>('route_short_name'),
-      routeLongName: row.read<String>('route_long_name'),
-      routeType: row.read<int>('route_type'),
-      routeColor: row.readNullable<String>('route_color'),
-      routeTextColor: row.readNullable<String>('route_text_color'),
-      routeDesc: row.readNullable<String>('route_desc'),
-    )).toList();
+    return results
+        .map((row) => GtfsRoute(
+              routeId: row.read<String>('route_id'),
+              agencyId: row.readNullable<String>('agency_id'),
+              routeShortName: row.read<String>('route_short_name'),
+              routeLongName: row.read<String>('route_long_name'),
+              routeType: row.read<int>('route_type'),
+              routeColor: row.readNullable<String>('route_color'),
+              routeTextColor: row.readNullable<String>('route_text_color'),
+              routeDesc: row.readNullable<String>('route_desc'),
+            ))
+        .toList();
   }
 
   /// Get stops for a route efficiently via JOIN.
   /// Uses the trip with the most stops (most representative) and returns
   /// stops in stop_sequence order.
-  Future<List<GtfsStop>> getStopsForRouteJoin(String routeId) async {
-    // Find the trip with the most stops for this route
-    final tripResult = await customSelect('''
-      SELECT st.trip_id, COUNT(*) AS stop_count
-      FROM gtfs_stop_times st
-      INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
-      WHERE t.route_id = ?
-      GROUP BY st.trip_id
-      ORDER BY stop_count DESC
-      LIMIT 1
-    ''', variables: [Variable.withString(routeId)]).getSingleOrNull();
+  /// If [directionId] is provided, filters to that direction only.
+  Future<List<GtfsStop>> getStopsForRouteJoin(String routeId,
+      {int? directionId}) async {
+    // Find the trip with the most stops for this route (optionally filtered by direction)
+    String tripQuery;
+    List<Variable> tripVars;
+    if (directionId != null) {
+      tripQuery = '''
+        SELECT st.trip_id, COUNT(*) AS stop_count
+        FROM gtfs_stop_times st
+        INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+        WHERE t.route_id = ? AND t.direction_id = ?
+        GROUP BY st.trip_id
+        ORDER BY stop_count DESC
+        LIMIT 1
+      ''';
+      tripVars = [Variable.withString(routeId), Variable.withInt(directionId)];
+    } else {
+      tripQuery = '''
+        SELECT st.trip_id, COUNT(*) AS stop_count
+        FROM gtfs_stop_times st
+        INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+        WHERE t.route_id = ?
+        GROUP BY st.trip_id
+        ORDER BY stop_count DESC
+        LIMIT 1
+      ''';
+      tripVars = [Variable.withString(routeId)];
+    }
+
+    final tripResult =
+        await customSelect(tripQuery, variables: tripVars).getSingleOrNull();
 
     if (tripResult == null) return [];
 
@@ -426,23 +459,50 @@ class AppDatabase extends _$AppDatabase {
       ORDER BY st.stop_sequence
     ''', variables: [Variable.withString(tripId)]).get();
 
-    return results.map((row) => GtfsStop(
-      stopId: row.read<String>('stop_id'),
-      stopCode: row.readNullable<String>('stop_code'),
-      stopName: row.read<String>('stop_name'),
-      stopDesc: row.readNullable<String>('stop_desc'),
-      stopLat: row.read<double>('stop_lat'),
-      stopLon: row.read<double>('stop_lon'),
-      locationType: row.readNullable<int>('location_type'),
-      parentStation: row.readNullable<String>('parent_station'),
-    )).toList();
+    return results
+        .map((row) => GtfsStop(
+              stopId: row.read<String>('stop_id'),
+              stopCode: row.readNullable<String>('stop_code'),
+              stopName: row.read<String>('stop_name'),
+              stopDesc: row.readNullable<String>('stop_desc'),
+              stopLat: row.read<double>('stop_lat'),
+              stopLon: row.read<double>('stop_lon'),
+              locationType: row.readNullable<int>('location_type'),
+              parentStation: row.readNullable<String>('parent_station'),
+            ))
+        .toList();
+  }
+
+  /// Get available direction IDs for a route.
+  Future<List<int>> getDirectionsForRoute(String routeId) async {
+    final results = await customSelect('''
+      SELECT DISTINCT t.direction_id
+      FROM gtfs_trips t
+      WHERE t.route_id = ? AND t.direction_id IS NOT NULL
+      ORDER BY t.direction_id
+    ''', variables: [Variable.withString(routeId)]).get();
+    return results.map((row) => row.read<int>('direction_id')).toList();
+  }
+
+  /// Get the headsign for a route direction.
+  Future<String?> getHeadsignForDirection(
+      String routeId, int directionId) async {
+    final result = await customSelect('''
+      SELECT t.trip_headsign
+      FROM gtfs_trips t
+      WHERE t.route_id = ? AND t.direction_id = ? AND t.trip_headsign IS NOT NULL
+      LIMIT 1
+    ''', variables: [
+      Variable.withString(routeId),
+      Variable.withInt(directionId),
+    ]).getSingleOrNull();
+    return result?.readNullable<String>('trip_headsign');
   }
 
   // ─── Calendar queries ─────────────────────────────────────────
 
   Future<GtfsCalendarData?> getCalendarByServiceId(String serviceId) {
-    return (select(gtfsCalendar)
-          ..where((c) => c.serviceId.equals(serviceId)))
+    return (select(gtfsCalendar)..where((c) => c.serviceId.equals(serviceId)))
         .getSingleOrNull();
   }
 
@@ -451,8 +511,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<List<GtfsCalendarDate>> getCalendarDatesByDate(String date) {
-    return (select(gtfsCalendarDates)..where((c) => c.date.equals(date)))
-        .get();
+    return (select(gtfsCalendarDates)..where((c) => c.date.equals(date))).get();
   }
 
   Future<List<GtfsCalendarDate>> getCalendarDatesByServiceId(String serviceId) {
@@ -507,22 +566,27 @@ class AppDatabase extends _$AppDatabase {
   // ─── Stats (for verifying sync) ───────────────────────────────
 
   Future<int> countStops() async {
-    final result = await customSelect('SELECT COUNT(*) AS c FROM gtfs_stops').getSingle();
+    final result =
+        await customSelect('SELECT COUNT(*) AS c FROM gtfs_stops').getSingle();
     return result.read<int>('c');
   }
 
   Future<int> countRoutes() async {
-    final result = await customSelect('SELECT COUNT(*) AS c FROM gtfs_routes').getSingle();
+    final result =
+        await customSelect('SELECT COUNT(*) AS c FROM gtfs_routes').getSingle();
     return result.read<int>('c');
   }
 
   Future<int> countTrips() async {
-    final result = await customSelect('SELECT COUNT(*) AS c FROM gtfs_trips').getSingle();
+    final result =
+        await customSelect('SELECT COUNT(*) AS c FROM gtfs_trips').getSingle();
     return result.read<int>('c');
   }
 
   Future<int> countStopTimes() async {
-    final result = await customSelect('SELECT COUNT(*) AS c FROM gtfs_stop_times').getSingle();
+    final result =
+        await customSelect('SELECT COUNT(*) AS c FROM gtfs_stop_times')
+            .getSingle();
     return result.read<int>('c');
   }
 }

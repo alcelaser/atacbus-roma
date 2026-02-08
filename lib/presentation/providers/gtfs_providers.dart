@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:geolocator/geolocator.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/utils/distance_utils.dart';
 import '../../data/datasources/remote/gtfs_realtime_api.dart';
 import '../../data/repositories/gtfs_repository_impl.dart';
 import '../../data/repositories/realtime_repository_impl.dart';
@@ -126,4 +129,71 @@ final routesByTypeProvider =
     FutureProvider.family<List<RouteEntity>, int>((ref, type) async {
   final repo = ref.watch(gtfsRepositoryProvider);
   return repo.getRoutesByType(type);
+});
+
+// ─── Nearby stops ─────────────────────────────────────────────
+
+/// A stop with pre-computed distance from the user.
+class NearbyStop {
+  final Stop stop;
+  final double distanceMeters;
+  const NearbyStop({required this.stop, required this.distanceMeters});
+}
+
+/// User location provider (reused from map_screen approach).
+final nearbyLocationProvider = FutureProvider<Position?>((ref) async {
+  bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnabled) return null;
+
+  LocationPermission permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) return null;
+  }
+  if (permission == LocationPermission.deniedForever) return null;
+
+  return Geolocator.getCurrentPosition(
+    desiredAccuracy: LocationAccuracy.medium,
+  );
+});
+
+/// Stops within 1 km of the user, sorted by distance.
+final nearbyStopsProvider = FutureProvider<List<NearbyStop>>((ref) async {
+  final position = await ref.watch(nearbyLocationProvider.future);
+  if (position == null) return [];
+
+  final repo = ref.watch(gtfsRepositoryProvider);
+  final allStops = await repo.getAllStops();
+
+  final nearby = <NearbyStop>[];
+  for (final stop in allStops) {
+    final distance = DistanceUtils.haversineDistance(
+      position.latitude,
+      position.longitude,
+      stop.stopLat,
+      stop.stopLon,
+    );
+    if (distance <= AppConstants.nearbyRadiusMeters) {
+      nearby.add(NearbyStop(stop: stop, distanceMeters: distance));
+    }
+  }
+  nearby.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+  return nearby.take(10).toList();
+});
+
+// ─── Route directions ─────────────────────────────────────────
+
+/// Available direction IDs for a route.
+final routeDirectionsProvider =
+    FutureProvider.family<List<int>, String>((ref, routeId) async {
+  final repo = ref.watch(gtfsRepositoryProvider);
+  return repo.getDirectionsForRoute(routeId);
+});
+
+/// Headsign for a given route + direction.
+final directionHeadsignProvider =
+    FutureProvider.family<String?, ({String routeId, int directionId})>(
+        (ref, params) async {
+  final repo = ref.watch(gtfsRepositoryProvider);
+  return repo.getHeadsignForDirection(params.routeId, params.directionId);
 });

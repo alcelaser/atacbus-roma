@@ -180,14 +180,29 @@ class GtfsRepositoryImpl implements GtfsRepository {
 
       bool dayActive;
       switch (weekday) {
-        case 1: dayActive = cal.monday; break;
-        case 2: dayActive = cal.tuesday; break;
-        case 3: dayActive = cal.wednesday; break;
-        case 4: dayActive = cal.thursday; break;
-        case 5: dayActive = cal.friday; break;
-        case 6: dayActive = cal.saturday; break;
-        case 7: dayActive = cal.sunday; break;
-        default: dayActive = false;
+        case 1:
+          dayActive = cal.monday;
+          break;
+        case 2:
+          dayActive = cal.tuesday;
+          break;
+        case 3:
+          dayActive = cal.wednesday;
+          break;
+        case 4:
+          dayActive = cal.thursday;
+          break;
+        case 5:
+          dayActive = cal.friday;
+          break;
+        case 6:
+          dayActive = cal.saturday;
+          break;
+        case 7:
+          dayActive = cal.sunday;
+          break;
+        default:
+          dayActive = false;
       }
 
       if (dayActive) {
@@ -211,9 +226,22 @@ class GtfsRepositoryImpl implements GtfsRepository {
   // ─── Route stops ────────────────────────────────────────────
 
   @override
-  Future<List<Stop>> getStopsForRoute(String routeId) async {
-    final stops = await _db.getStopsForRouteJoin(routeId);
+  Future<List<Stop>> getStopsForRoute(String routeId,
+      {int? directionId}) async {
+    final stops =
+        await _db.getStopsForRouteJoin(routeId, directionId: directionId);
     return stops.map(_mapStop).toList();
+  }
+
+  @override
+  Future<List<int>> getDirectionsForRoute(String routeId) async {
+    return _db.getDirectionsForRoute(routeId);
+  }
+
+  @override
+  Future<String?> getHeadsignForDirection(
+      String routeId, int directionId) async {
+    return _db.getHeadsignForDirection(routeId, directionId);
   }
 
   @override
@@ -242,7 +270,7 @@ class GtfsRepositoryImpl implements GtfsRepository {
   @override
   Stream<List<String>> watchFavoriteStopIds() {
     return _db.watchFavorites().map(
-      (favs) => favs.map((f) => f.stopId).toList(),
-    );
+          (favs) => favs.map((f) => f.stopId).toList(),
+        );
   }
 }

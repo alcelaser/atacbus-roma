@@ -75,7 +75,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final vehiclesAsync = ref.watch(vehiclePositionsProvider);
     final locationAsync = ref.watch(userLocationProvider);
 
-    final romeCenter = LatLng(
+    const romeCenter = LatLng(
       AppConstants.defaultLatitude,
       AppConstants.defaultLongitude,
     );
@@ -120,9 +120,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         mapController: _mapController,
         options: MapOptions(
           initialCenter: locationAsync.whenOrNull(
-                data: (pos) => pos != null
-                    ? LatLng(pos.latitude, pos.longitude)
-                    : null,
+                data: (pos) =>
+                    pos != null ? LatLng(pos.latitude, pos.longitude) : null,
               ) ??
               romeCenter,
           initialZoom: 14.0,
@@ -149,8 +148,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             decoration: BoxDecoration(
                               color: theme.colorScheme.primary,
                               shape: BoxShape.circle,
-                              border:
-                                  Border.all(color: Colors.white, width: 2),
+                              border: Border.all(color: Colors.white, width: 2),
                             ),
                             child: const Icon(
                               Icons.directions_bus,

@@ -9,7 +9,6 @@ import 'package:atacbus_roma/domain/repositories/gtfs_repository.dart';
 import 'package:atacbus_roma/domain/repositories/realtime_repository.dart';
 import 'package:atacbus_roma/domain/usecases/get_stop_departures.dart';
 import 'package:atacbus_roma/data/datasources/local/database/app_database.dart';
-import 'package:atacbus_roma/data/repositories/gtfs_repository_impl.dart';
 
 // ─── Mock classes ────────────────────────────────────────────
 
@@ -70,7 +69,15 @@ class MockGtfsRepo implements GtfsRepository {
   @override
   Future<List<RouteEntity>> getRoutesForStop(String stopId) async => routes;
   @override
-  Future<List<Stop>> getStopsForRoute(String routeId) async => stops;
+  Future<List<Stop>> getStopsForRoute(String routeId,
+          {int? directionId}) async =>
+      stops;
+  @override
+  Future<List<int>> getDirectionsForRoute(String routeId) async => [];
+  @override
+  Future<String?> getHeadsignForDirection(
+          String routeId, int directionId) async =>
+      null;
   @override
   Future<bool> isFavorite(String stopId) async => false;
   @override
@@ -993,13 +1000,13 @@ void main() {
       // And currentTimeAsSeconds at 1:30 AM should also be > 86400
       // due to the +86400 fix, so comparison works
       // We can't control time here, but we verify the math
-      final simulatedCurrent130am = 1 * 3600 + 30 * 60 + 86400;
+      const simulatedCurrent130am = 1 * 3600 + 30 * 60 + 86400;
       expect(simulatedCurrent130am, closeTo(t, 3600)); // within 1 hour
     });
 
     test('midday comparison picks correct upcoming departures', () {
       // Simulate noon (12:00)
-      final noonSeconds = 12 * 3600; // 43200
+      const noonSeconds = 12 * 3600; // 43200
       final departures = [
         28800, // 08:00 - past
         43200, // 12:00 - now
@@ -1017,7 +1024,7 @@ void main() {
 
     test('2 AM comparison with after-midnight GTFS times works', () {
       // Simulate 2:00 AM with the +86400 fix applied
-      final twoAmSeconds = 2 * 3600 + 86400; // 93600
+      const twoAmSeconds = 2 * 3600 + 86400; // 93600
       final afterMidnightDepartures = [
         90000, // 25:00:00 (1:00 AM)
         91800, // 25:30:00 (1:30 AM)

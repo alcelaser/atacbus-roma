@@ -101,5 +101,15 @@
   "refresh": "Refresh",
   "noResults": "No results found",
   "locationPermissionDenied": "Location permission denied",
-  "locationServiceDisabled": "Location services are disabled"
+  "locationServiceDisabled": "Location services are disabled",
+  "outbound": "Outbound",
+  "inbound": "Return",
+  "metersAway": "{distance} m away",
+  "@metersAway": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  }
 }

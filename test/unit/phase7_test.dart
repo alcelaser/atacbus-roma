@@ -146,7 +146,7 @@ void main() {
     });
 
     test('app name matches', () {
-      expect(AppConstants.appName, 'ATAC Bus Roma');
+      expect(AppConstants.appName, 'BUS - Roma');
     });
 
     test('default coordinates are in Rome', () {

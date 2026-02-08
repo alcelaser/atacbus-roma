@@ -1,4 +1,3 @@
-import '../entities/departure.dart';
 import '../entities/vehicle.dart';
 import '../entities/service_alert.dart';
 
