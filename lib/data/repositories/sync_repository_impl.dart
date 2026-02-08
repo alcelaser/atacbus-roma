@@ -139,12 +139,16 @@ class SyncRepositoryImpl {
   Future<void> _importTable<T>(
     String dir,
     String filename,
-    T Function(Map<String, String> row) parse,
+    T? Function(Map<String, String> row) parse,
     Future<void> Function(List<T> rows) insert,
   ) async {
     final content = await _fileStorage.readGtfsFile(dir, filename);
     final rows = GtfsCsvParser.parse(content);
-    final companions = rows.map(parse).toList();
+    final companions = <T>[];
+    for (final row in rows) {
+      final parsed = parse(row);
+      if (parsed != null) companions.add(parsed);
+    }
     for (var i = 0; i < companions.length; i += AppConstants.dbBatchSize) {
       final end = (i + AppConstants.dbBatchSize).clamp(0, companions.length);
       await insert(companions.sublist(i, end));
@@ -161,7 +165,7 @@ class SyncRepositoryImpl {
   Stream<double> _importLargeTable<T>(
     String dir,
     String filename,
-    T Function(Map<String, String> row) parse,
+    T? Function(Map<String, String> row) parse,
     Future<void> Function(List<T> rows) insert,
   ) async* {
     final content = await _fileStorage.readGtfsFile(dir, filename);
@@ -197,7 +201,9 @@ class SyncRepositoryImpl {
         map[headers[j]] = values[j];
       }
 
-      batch.add(parse(map));
+      final parsed = parse(map);
+      if (parsed == null) continue; // skip rows with missing/empty PKs
+      batch.add(parsed);
       processed++;
 
       if (batch.length >= AppConstants.dbBatchSize) {
@@ -243,9 +249,11 @@ class SyncRepositoryImpl {
 
   // ─── Row parsers ─────────────────────────────────────────────────
 
-  static GtfsStopsCompanion _parseStop(Map<String, String> row) {
+  static GtfsStopsCompanion? _parseStop(Map<String, String> row) {
+    final stopId = row['stop_id'] ?? '';
+    if (stopId.isEmpty) return null;
     return GtfsStopsCompanion.insert(
-      stopId: row['stop_id'] ?? '',
+      stopId: stopId,
       stopCode: Value(row['stop_code']),
       stopName: row['stop_name'] ?? '',
       stopDesc: Value(row['stop_desc']),
@@ -256,9 +264,11 @@ class SyncRepositoryImpl {
     );
   }
 
-  static GtfsRoutesCompanion _parseRoute(Map<String, String> row) {
+  static GtfsRoutesCompanion? _parseRoute(Map<String, String> row) {
+    final routeId = row['route_id'] ?? '';
+    if (routeId.isEmpty) return null;
     return GtfsRoutesCompanion.insert(
-      routeId: row['route_id'] ?? '',
+      routeId: routeId,
       agencyId: Value(row['agency_id']),
       routeShortName: row['route_short_name'] ?? '',
       routeLongName: row['route_long_name'] ?? '',
@@ -269,9 +279,11 @@ class SyncRepositoryImpl {
     );
   }
 
-  static GtfsTripsCompanion _parseTrip(Map<String, String> row) {
+  static GtfsTripsCompanion? _parseTrip(Map<String, String> row) {
+    final tripId = row['trip_id'] ?? '';
+    if (tripId.isEmpty) return null;
     return GtfsTripsCompanion.insert(
-      tripId: row['trip_id'] ?? '',
+      tripId: tripId,
       routeId: row['route_id'] ?? '',
       serviceId: row['service_id'] ?? '',
       tripHeadsign: Value(row['trip_headsign']),
@@ -281,12 +293,15 @@ class SyncRepositoryImpl {
     );
   }
 
-  static GtfsStopTimesCompanion _parseStopTime(Map<String, String> row) {
+  static GtfsStopTimesCompanion? _parseStopTime(Map<String, String> row) {
+    final tripId = row['trip_id'] ?? '';
+    final stopId = row['stop_id'] ?? '';
+    if (tripId.isEmpty || stopId.isEmpty) return null;
     return GtfsStopTimesCompanion.insert(
-      tripId: row['trip_id'] ?? '',
+      tripId: tripId,
       arrivalTime: row['arrival_time'] ?? '',
       departureTime: row['departure_time'] ?? '',
-      stopId: row['stop_id'] ?? '',
+      stopId: stopId,
       stopSequence: int.tryParse(row['stop_sequence'] ?? '') ?? 0,
       stopHeadsign: Value(row['stop_headsign']),
       pickupType: Value(int.tryParse(row['pickup_type'] ?? '')),
@@ -294,9 +309,11 @@ class SyncRepositoryImpl {
     );
   }
 
-  static GtfsCalendarCompanion _parseCalendar(Map<String, String> row) {
+  static GtfsCalendarCompanion? _parseCalendar(Map<String, String> row) {
+    final serviceId = row['service_id'] ?? '';
+    if (serviceId.isEmpty) return null;
     return GtfsCalendarCompanion.insert(
-      serviceId: row['service_id'] ?? '',
+      serviceId: serviceId,
       monday: row['monday'] == '1',
       tuesday: row['tuesday'] == '1',
       wednesday: row['wednesday'] == '1',
@@ -309,17 +326,22 @@ class SyncRepositoryImpl {
     );
   }
 
-  static GtfsCalendarDatesCompanion _parseCalendarDate(Map<String, String> row) {
+  static GtfsCalendarDatesCompanion? _parseCalendarDate(Map<String, String> row) {
+    final serviceId = row['service_id'] ?? '';
+    final date = row['date'] ?? '';
+    if (serviceId.isEmpty || date.isEmpty) return null;
     return GtfsCalendarDatesCompanion.insert(
-      serviceId: row['service_id'] ?? '',
-      date: row['date'] ?? '',
+      serviceId: serviceId,
+      date: date,
       exceptionType: int.tryParse(row['exception_type'] ?? '') ?? 0,
     );
   }
 
-  static GtfsShapesCompanion _parseShape(Map<String, String> row) {
+  static GtfsShapesCompanion? _parseShape(Map<String, String> row) {
+    final shapeId = row['shape_id'] ?? '';
+    if (shapeId.isEmpty) return null;
     return GtfsShapesCompanion.insert(
-      shapeId: row['shape_id'] ?? '',
+      shapeId: shapeId,
       shapePtLat: double.tryParse(row['shape_pt_lat'] ?? '') ?? 0.0,
       shapePtLon: double.tryParse(row['shape_pt_lon'] ?? '') ?? 0.0,
       shapePtSequence: int.tryParse(row['shape_pt_sequence'] ?? '') ?? 0,

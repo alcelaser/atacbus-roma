@@ -14,7 +14,12 @@ class GtfsCsvParser {
     );
 
     // Normalize line endings to \n
-    final normalized = csvContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    var normalized = csvContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+    // Strip UTF-8 BOM if present
+    if (normalized.isNotEmpty && normalized.codeUnitAt(0) == 0xFEFF) {
+      normalized = normalized.substring(1);
+    }
 
     final rows = converter.convert(normalized);
     if (rows.isEmpty) return [];

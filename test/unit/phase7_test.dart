@@ -174,8 +174,9 @@ void main() {
         const Vehicle(tripId: 't4', latitude: null, longitude: 12.3), // partial
       ];
 
-      final onMap =
-          vehicles.where((v) => v.latitude != null && v.longitude != null).toList();
+      final onMap = vehicles
+          .where((v) => v.latitude != null && v.longitude != null)
+          .toList();
       expect(onMap.length, 2);
       expect(onMap[0].tripId, 't1');
       expect(onMap[1].tripId, 't3');
@@ -278,7 +279,8 @@ void main() {
       }).toList();
 
       expect(active.length, 2);
-      expect(active.map((a) => a.alertId), containsAll(['active', 'no_period']));
+      expect(
+          active.map((a) => a.alertId), containsAll(['active', 'no_period']));
     });
   });
 }

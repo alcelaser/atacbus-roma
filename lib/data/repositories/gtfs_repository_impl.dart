@@ -212,16 +212,8 @@ class GtfsRepositoryImpl implements GtfsRepository {
 
   @override
   Future<List<Stop>> getStopsForRoute(String routeId) async {
-    final trips = await _db.getTripsByRouteId(routeId);
-    if (trips.isEmpty) return [];
-
-    final stopTimes = await _db.getStopTimesForTrip(trips.first.tripId);
-    final stops = <Stop>[];
-    for (final st in stopTimes) {
-      final stop = await _db.getStopById(st.stopId);
-      if (stop != null) stops.add(_mapStop(stop));
-    }
-    return stops;
+    final stops = await _db.getStopsForRouteJoin(routeId);
+    return stops.map(_mapStop).toList();
   }
 
   @override

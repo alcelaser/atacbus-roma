@@ -35,8 +35,7 @@ class AlertsScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   Icon(Icons.cloud_off,
-                      size: 16,
-                      color: theme.colorScheme.onErrorContainer),
+                      size: 16, color: theme.colorScheme.onErrorContainer),
                   const SizedBox(width: 8),
                   Text(
                     l10n.offline,
@@ -64,8 +63,7 @@ class AlertsScreen extends ConsumerWidget {
                         Text(
                           l10n.noAlerts,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            color:
-                                theme.colorScheme.onSurface.withOpacity(0.5),
+                            color: theme.colorScheme.onSurface.withOpacity(0.5),
                           ),
                         ),
                       ],

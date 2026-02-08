@@ -150,36 +150,51 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
-          // Create indexes for performance
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_stop_times_stop_id ON gtfs_stop_times(stop_id)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_stop_times_trip_id ON gtfs_stop_times(trip_id)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_trips_route_id ON gtfs_trips(route_id)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_trips_service_id ON gtfs_trips(service_id)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_stops_name ON gtfs_stops(stop_name COLLATE NOCASE)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_calendar_dates_date ON gtfs_calendar_dates(date)',
-          );
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_shapes_shape_id ON gtfs_shapes(shape_id)',
-          );
+          await _createIndexes();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          // Re-create indexes on every upgrade to ensure they exist
+          await _createIndexes();
         },
       );
+
+  Future<void> _createIndexes() async {
+    // Primary lookup: departures for a stop
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_stop_times_stop_id ON gtfs_stop_times(stop_id)',
+    );
+    // Composite: stop + departure_time for range scans
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_stop_times_stop_dep ON gtfs_stop_times(stop_id, departure_time)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_stop_times_trip_id ON gtfs_stop_times(trip_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_trips_route_id ON gtfs_trips(route_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_trips_service_id ON gtfs_trips(service_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_stops_name ON gtfs_stops(stop_name COLLATE NOCASE)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_calendar_dates_date ON gtfs_calendar_dates(date)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_calendar_dates_service ON gtfs_calendar_dates(service_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_shapes_shape_id ON gtfs_shapes(shape_id)',
+    );
+  }
 
   // ─── Clear all GTFS tables (for re-sync) ─────────────────────
 
@@ -228,8 +243,13 @@ class AppDatabase extends _$AppDatabase {
   // ─── Stop queries ─────────────────────────────────────────────
 
   Future<List<GtfsStop>> searchStopsByName(String query) {
+    // Escape LIKE wildcards in user input to prevent unintended matches
+    final escaped = query
+        .replaceAll('\\', '\\\\')
+        .replaceAll('%', '\\%')
+        .replaceAll('_', '\\_');
     return (select(gtfsStops)
-          ..where((s) => s.stopName.like('%$query%'))
+          ..where((s) => s.stopName.like('%$escaped%'))
           ..limit(50))
         .get();
   }
@@ -376,6 +396,45 @@ class AppDatabase extends _$AppDatabase {
       routeColor: row.readNullable<String>('route_color'),
       routeTextColor: row.readNullable<String>('route_text_color'),
       routeDesc: row.readNullable<String>('route_desc'),
+    )).toList();
+  }
+
+  /// Get stops for a route efficiently via JOIN.
+  /// Uses the trip with the most stops (most representative) and returns
+  /// stops in stop_sequence order.
+  Future<List<GtfsStop>> getStopsForRouteJoin(String routeId) async {
+    // Find the trip with the most stops for this route
+    final tripResult = await customSelect('''
+      SELECT st.trip_id, COUNT(*) AS stop_count
+      FROM gtfs_stop_times st
+      INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+      WHERE t.route_id = ?
+      GROUP BY st.trip_id
+      ORDER BY stop_count DESC
+      LIMIT 1
+    ''', variables: [Variable.withString(routeId)]).getSingleOrNull();
+
+    if (tripResult == null) return [];
+
+    final tripId = tripResult.read<String>('trip_id');
+
+    final results = await customSelect('''
+      SELECT s.*
+      FROM gtfs_stop_times st
+      INNER JOIN gtfs_stops s ON s.stop_id = st.stop_id
+      WHERE st.trip_id = ?
+      ORDER BY st.stop_sequence
+    ''', variables: [Variable.withString(tripId)]).get();
+
+    return results.map((row) => GtfsStop(
+      stopId: row.read<String>('stop_id'),
+      stopCode: row.readNullable<String>('stop_code'),
+      stopName: row.read<String>('stop_name'),
+      stopDesc: row.readNullable<String>('stop_desc'),
+      stopLat: row.read<double>('stop_lat'),
+      stopLon: row.read<double>('stop_lon'),
+      locationType: row.readNullable<int>('location_type'),
+      parentStation: row.readNullable<String>('parent_station'),
     )).toList();
   }
 

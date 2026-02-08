@@ -96,12 +96,17 @@ class MockGtfsRepo implements GtfsRepository {
   @override
   Future<bool> isFavorite(String stopId) async => _isFavorite;
   @override
-  Future<void> addFavorite(String stopId) async { _isFavorite = true; }
+  Future<void> addFavorite(String stopId) async {
+    _isFavorite = true;
+  }
+
   @override
-  Future<void> removeFavorite(String stopId) async { _isFavorite = false; }
+  Future<void> removeFavorite(String stopId) async {
+    _isFavorite = false;
+  }
+
   @override
-  Future<List<String>> getFavoriteStopIds() async =>
-      _isFavorite ? ['S1'] : [];
+  Future<List<String>> getFavoriteStopIds() async => _isFavorite ? ['S1'] : [];
   @override
   Stream<List<String>> watchFavoriteStopIds() => const Stream.empty();
 }
@@ -117,6 +122,7 @@ class MockRtRepo implements RealtimeRepository {
     if (shouldThrow) throw Exception('RT error');
     return delays;
   }
+
   @override
   Future<List<Vehicle>> getVehiclePositions() async => [];
   @override
@@ -135,14 +141,22 @@ void main() {
 
   group('BUG FIX: CSV header parsing (_splitCsvLine vs split)', () {
     test('splitCsvLine strips double-quotes from headers', () {
-      const headerLine = '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
+      const headerLine =
+          '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
       final headers = splitCsvLine(headerLine).map((h) => h.trim()).toList();
 
-      expect(headers, ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence']);
+      expect(headers, [
+        'trip_id',
+        'arrival_time',
+        'departure_time',
+        'stop_id',
+        'stop_sequence'
+      ]);
     });
 
     test('plain split does NOT strip quotes (demonstrates the bug)', () {
-      const headerLine = '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
+      const headerLine =
+          '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
       final buggyHeaders = headerLine.split(',').map((h) => h.trim()).toList();
 
       // Bug: headers contain quotes
@@ -151,10 +165,17 @@ void main() {
     });
 
     test('splitCsvLine handles unquoted headers correctly', () {
-      const headerLine = 'trip_id,arrival_time,departure_time,stop_id,stop_sequence';
+      const headerLine =
+          'trip_id,arrival_time,departure_time,stop_id,stop_sequence';
       final headers = splitCsvLine(headerLine).map((h) => h.trim()).toList();
 
-      expect(headers, ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence']);
+      expect(headers, [
+        'trip_id',
+        'arrival_time',
+        'departure_time',
+        'stop_id',
+        'stop_sequence'
+      ]);
     });
 
     test('splitCsvLine handles mixed quoted and unquoted headers', () {
@@ -187,7 +208,8 @@ void main() {
     });
 
     test('fixed: quoted headers produce correct map key lookups', () {
-      const headerLine = '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
+      const headerLine =
+          '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
       const dataLine = 'T001,08:00:00,08:01:00,S001,1';
 
       final headers = splitCsvLine(headerLine).map((h) => h.trim()).toList();
@@ -207,7 +229,8 @@ void main() {
     });
 
     test('BUG: buggy split produces broken map lookups', () {
-      const headerLine = '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
+      const headerLine =
+          '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"';
       const dataLine = 'T001,08:00:00,08:01:00,S001,1';
 
       // Buggy: using split(',') instead of splitCsvLine
@@ -258,17 +281,27 @@ void main() {
     });
 
     test('full ATAC-style stop_times header with all columns', () {
-      const headerLine = '"trip_id","arrival_time","departure_time","stop_id","stop_sequence","stop_headsign","pickup_type","drop_off_type"';
+      const headerLine =
+          '"trip_id","arrival_time","departure_time","stop_id","stop_sequence","stop_headsign","pickup_type","drop_off_type"';
       final headers = splitCsvLine(headerLine).map((h) => h.trim()).toList();
 
       expect(headers, [
-        'trip_id', 'arrival_time', 'departure_time', 'stop_id',
-        'stop_sequence', 'stop_headsign', 'pickup_type', 'drop_off_type',
+        'trip_id',
+        'arrival_time',
+        'departure_time',
+        'stop_id',
+        'stop_sequence',
+        'stop_headsign',
+        'pickup_type',
+        'drop_off_type',
       ]);
     });
 
-    test('end-to-end: quoted headers + data row produce working _parseStopTime input', () {
-      const headerLine = '"trip_id","arrival_time","departure_time","stop_id","stop_sequence","stop_headsign","pickup_type","drop_off_type"';
+    test(
+        'end-to-end: quoted headers + data row produce working _parseStopTime input',
+        () {
+      const headerLine =
+          '"trip_id","arrival_time","departure_time","stop_id","stop_sequence","stop_headsign","pickup_type","drop_off_type"';
       const dataLine = 'T_12345,08:30:00,08:31:00,70001,5,,0,0';
 
       final headers = splitCsvLine(headerLine).map((h) => h.trim()).toList();
@@ -312,11 +345,13 @@ void main() {
     });
 
     test('parseGtfsTime throws on non-numeric parts', () {
-      expect(() => DateTimeUtils.parseGtfsTime('ab:cd:ef'), throwsA(isA<FormatException>()));
+      expect(() => DateTimeUtils.parseGtfsTime('ab:cd:ef'),
+          throwsA(isA<FormatException>()));
     });
 
     test('parseGtfsTime throws on extra colons', () {
-      expect(() => DateTimeUtils.parseGtfsTime('08:30:00:00'), throwsFormatException);
+      expect(() => DateTimeUtils.parseGtfsTime('08:30:00:00'),
+          throwsFormatException);
     });
 
     test('parseGtfsTime handles valid times correctly', () {
@@ -336,12 +371,18 @@ void main() {
     test('good rows are parsed correctly', () {
       final rows = [
         DepartureRow(
-          tripId: 'T1', departureTime: '08:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T1',
+          departureTime: '08:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T2', departureTime: '12:30:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T2',
+          departureTime: '12:30:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
       ];
 
@@ -354,16 +395,25 @@ void main() {
     test('malformed departure_time rows are skipped (not crash)', () {
       final rows = [
         DepartureRow(
-          tripId: 'T_GOOD', departureTime: '12:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T_GOOD',
+          departureTime: '12:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T_BAD', departureTime: 'INVALID',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T_BAD',
+          departureTime: 'INVALID',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T_PARTIAL', departureTime: '08:30',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T_PARTIAL',
+          departureTime: '08:30',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
       ];
 
@@ -375,16 +425,25 @@ void main() {
     test('empty departure_time rows are skipped', () {
       final rows = [
         DepartureRow(
-          tripId: 'T_EMPTY', departureTime: '',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T_EMPTY',
+          departureTime: '',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T_SPACES', departureTime: '   ',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T_SPACES',
+          departureTime: '   ',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T_GOOD', departureTime: '10:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T_GOOD',
+          departureTime: '10:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
       ];
 
@@ -396,12 +455,18 @@ void main() {
     test('all malformed rows returns empty list', () {
       final rows = [
         DepartureRow(
-          tripId: 'T1', departureTime: 'bad',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T1',
+          departureTime: 'bad',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T2', departureTime: '',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T2',
+          departureTime: '',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
       ];
 
@@ -412,12 +477,18 @@ void main() {
     test('after-midnight GTFS times parse correctly', () {
       final rows = [
         DepartureRow(
-          tripId: 'T_NIGHT', departureTime: '25:30:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: 'N1',
+          tripId: 'T_NIGHT',
+          departureTime: '25:30:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: 'N1',
         ),
         DepartureRow(
-          tripId: 'T_LATE', departureTime: '27:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: 'N1',
+          tripId: 'T_LATE',
+          departureTime: '27:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: 'N1',
         ),
       ];
 
@@ -430,16 +501,25 @@ void main() {
     test('departures are sorted by scheduledSeconds', () {
       final rows = [
         DepartureRow(
-          tripId: 'T3', departureTime: '15:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T3',
+          departureTime: '15:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T1', departureTime: '08:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T1',
+          departureTime: '08:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
         DepartureRow(
-          tripId: 'T2', departureTime: '12:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
+          tripId: 'T2',
+          departureTime: '12:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
         ),
       ];
 
@@ -449,11 +529,36 @@ void main() {
 
     test('bad rows interspersed with good rows — only bad ones skipped', () {
       final rows = [
-        DepartureRow(tripId: 'T1', departureTime: '08:00:00', routeId: 'R1', serviceId: 'SVC1', routeShortName: '64'),
-        DepartureRow(tripId: 'T2', departureTime: 'X', routeId: 'R1', serviceId: 'SVC1', routeShortName: '64'), // bad
-        DepartureRow(tripId: 'T3', departureTime: '10:00:00', routeId: 'R1', serviceId: 'SVC1', routeShortName: '64'),
-        DepartureRow(tripId: 'T4', departureTime: '', routeId: 'R1', serviceId: 'SVC1', routeShortName: '64'), // bad
-        DepartureRow(tripId: 'T5', departureTime: '12:00:00', routeId: 'R1', serviceId: 'SVC1', routeShortName: '64'),
+        DepartureRow(
+            tripId: 'T1',
+            departureTime: '08:00:00',
+            routeId: 'R1',
+            serviceId: 'SVC1',
+            routeShortName: '64'),
+        DepartureRow(
+            tripId: 'T2',
+            departureTime: 'X',
+            routeId: 'R1',
+            serviceId: 'SVC1',
+            routeShortName: '64'), // bad
+        DepartureRow(
+            tripId: 'T3',
+            departureTime: '10:00:00',
+            routeId: 'R1',
+            serviceId: 'SVC1',
+            routeShortName: '64'),
+        DepartureRow(
+            tripId: 'T4',
+            departureTime: '',
+            routeId: 'R1',
+            serviceId: 'SVC1',
+            routeShortName: '64'), // bad
+        DepartureRow(
+            tripId: 'T5',
+            departureTime: '12:00:00',
+            routeId: 'R1',
+            serviceId: 'SVC1',
+            routeShortName: '64'),
       ];
 
       final departures = rowsToDepartures(rows);
@@ -464,9 +569,13 @@ void main() {
     test('tripHeadsign falls back to stopHeadsign', () {
       final rows = [
         DepartureRow(
-          tripId: 'T1', departureTime: '12:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
-          tripHeadsign: null, stopHeadsign: 'Capolinea',
+          tripId: 'T1',
+          departureTime: '12:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
+          tripHeadsign: null,
+          stopHeadsign: 'Capolinea',
         ),
       ];
 
@@ -477,9 +586,13 @@ void main() {
     test('tripHeadsign takes priority over stopHeadsign', () {
       final rows = [
         DepartureRow(
-          tripId: 'T1', departureTime: '12:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
-          tripHeadsign: 'Termini', stopHeadsign: 'Via Nazionale',
+          tripId: 'T1',
+          departureTime: '12:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
+          tripHeadsign: 'Termini',
+          stopHeadsign: 'Via Nazionale',
         ),
       ];
 
@@ -490,9 +603,13 @@ void main() {
     test('routeColor and directionId are preserved', () {
       final rows = [
         DepartureRow(
-          tripId: 'T1', departureTime: '12:00:00',
-          routeId: 'R1', serviceId: 'SVC1', routeShortName: '64',
-          routeColor: 'FF0000', directionId: 0,
+          tripId: 'T1',
+          departureTime: '12:00:00',
+          routeId: 'R1',
+          serviceId: 'SVC1',
+          routeShortName: '64',
+          routeColor: 'FF0000',
+          directionId: 0,
         ),
       ];
 
@@ -511,25 +628,30 @@ void main() {
   group('BUG FIX: Sync redirect logic', () {
     test('AsyncData(false) should trigger redirect', () {
       final asyncVal = AsyncValue.data(false);
-      final shouldRedirect = !asyncVal.isLoading && asyncVal.valueOrNull == false;
+      final shouldRedirect =
+          !asyncVal.isLoading && asyncVal.valueOrNull == false;
       expect(shouldRedirect, true);
     });
 
     test('AsyncData(true) should NOT trigger redirect', () {
       final asyncVal = AsyncValue.data(true);
-      final shouldRedirect = !asyncVal.isLoading && asyncVal.valueOrNull == false;
+      final shouldRedirect =
+          !asyncVal.isLoading && asyncVal.valueOrNull == false;
       expect(shouldRedirect, false);
     });
 
     test('AsyncLoading should NOT trigger redirect', () {
       const asyncVal = AsyncValue<bool>.loading();
-      final shouldRedirect = !asyncVal.isLoading && asyncVal.valueOrNull == false;
+      final shouldRedirect =
+          !asyncVal.isLoading && asyncVal.valueOrNull == false;
       expect(shouldRedirect, false);
     });
 
     test('AsyncError should NOT trigger redirect', () {
-      final asyncVal = AsyncValue<bool>.error(Exception('test'), StackTrace.empty);
-      final shouldRedirect = !asyncVal.isLoading && asyncVal.valueOrNull == false;
+      final asyncVal =
+          AsyncValue<bool>.error(Exception('test'), StackTrace.empty);
+      final shouldRedirect =
+          !asyncVal.isLoading && asyncVal.valueOrNull == false;
       expect(shouldRedirect, false);
     });
 
@@ -606,8 +728,11 @@ void main() {
       final now = DateTimeUtils.currentTimeAsSeconds();
       final mockGtfs = MockGtfsRepo(departures: [
         Departure(
-          tripId: 't_in', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '08:00:00', scheduledSeconds: now + 1800,
+          tripId: 't_in',
+          routeId: 'r1',
+          routeShortName: '64',
+          scheduledTime: '08:00:00',
+          scheduledSeconds: now + 1800,
         ),
       ]);
 
@@ -620,8 +745,11 @@ void main() {
       final now = DateTimeUtils.currentTimeAsSeconds();
       final mockGtfs = MockGtfsRepo(departures: [
         Departure(
-          tripId: 't_past', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '06:00:00', scheduledSeconds: now - 1800,
+          tripId: 't_past',
+          routeId: 'r1',
+          routeShortName: '64',
+          scheduledTime: '06:00:00',
+          scheduledSeconds: now - 1800,
         ),
       ]);
 
@@ -634,8 +762,11 @@ void main() {
       final now = DateTimeUtils.currentTimeAsSeconds();
       final mockGtfs = MockGtfsRepo(departures: [
         Departure(
-          tripId: 't_far', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '12:00:00', scheduledSeconds: now + 7200,
+          tripId: 't_far',
+          routeId: 'r1',
+          routeShortName: '64',
+          scheduledTime: '12:00:00',
+          scheduledSeconds: now + 7200,
         ),
       ]);
 
@@ -647,14 +778,30 @@ void main() {
     test('mixed past/future keeps only upcoming within 90 min', () async {
       final now = DateTimeUtils.currentTimeAsSeconds();
       final mockGtfs = MockGtfsRepo(departures: [
-        Departure(tripId: 't_past', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '06:00:00', scheduledSeconds: now - 600),
-        Departure(tripId: 't_soon', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '07:00:00', scheduledSeconds: now + 60),
-        Departure(tripId: 't_later', routeId: 'r1', routeShortName: '40',
-          scheduledTime: '07:30:00', scheduledSeconds: now + 1800),
-        Departure(tripId: 't_far', routeId: 'r1', routeShortName: '170',
-          scheduledTime: '12:00:00', scheduledSeconds: now + 10800),
+        Departure(
+            tripId: 't_past',
+            routeId: 'r1',
+            routeShortName: '64',
+            scheduledTime: '06:00:00',
+            scheduledSeconds: now - 600),
+        Departure(
+            tripId: 't_soon',
+            routeId: 'r1',
+            routeShortName: '64',
+            scheduledTime: '07:00:00',
+            scheduledSeconds: now + 60),
+        Departure(
+            tripId: 't_later',
+            routeId: 'r1',
+            routeShortName: '40',
+            scheduledTime: '07:30:00',
+            scheduledSeconds: now + 1800),
+        Departure(
+            tripId: 't_far',
+            routeId: 'r1',
+            routeShortName: '170',
+            scheduledTime: '12:00:00',
+            scheduledSeconds: now + 10800),
       ]);
 
       final useCase = GetStopDepartures(mockGtfs, null);
@@ -675,8 +822,12 @@ void main() {
     test('applies positive delay', () async {
       final now = DateTimeUtils.currentTimeAsSeconds();
       final mockGtfs = MockGtfsRepo(departures: [
-        Departure(tripId: 't1', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '08:00:00', scheduledSeconds: now + 600),
+        Departure(
+            tripId: 't1',
+            routeId: 'r1',
+            routeShortName: '64',
+            scheduledTime: '08:00:00',
+            scheduledSeconds: now + 600),
       ]);
       final mockRt = MockRtRepo(delays: {'t1': 300});
 
@@ -691,8 +842,12 @@ void main() {
     test('RT failure falls back to scheduled gracefully', () async {
       final now = DateTimeUtils.currentTimeAsSeconds();
       final mockGtfs = MockGtfsRepo(departures: [
-        Departure(tripId: 't1', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '08:00:00', scheduledSeconds: now + 600),
+        Departure(
+            tripId: 't1',
+            routeId: 'r1',
+            routeShortName: '64',
+            scheduledTime: '08:00:00',
+            scheduledSeconds: now + 600),
       ]);
       final mockRt = MockRtRepo(shouldThrow: true);
 
@@ -706,8 +861,12 @@ void main() {
     test('null RT repository returns scheduled data', () async {
       final now = DateTimeUtils.currentTimeAsSeconds();
       final mockGtfs = MockGtfsRepo(departures: [
-        Departure(tripId: 't1', routeId: 'r1', routeShortName: '64',
-          scheduledTime: '08:00:00', scheduledSeconds: now + 600),
+        Departure(
+            tripId: 't1',
+            routeId: 'r1',
+            routeShortName: '64',
+            scheduledTime: '08:00:00',
+            scheduledSeconds: now + 600),
       ]);
 
       final useCase = GetStopDepartures(mockGtfs, null);
@@ -723,8 +882,11 @@ void main() {
   group('DepartureRow', () {
     test('creates with all required fields', () {
       final row = DepartureRow(
-        tripId: 'trip_1', departureTime: '08:30:00',
-        routeId: 'route_64', serviceId: 'svc_weekday', routeShortName: '64',
+        tripId: 'trip_1',
+        departureTime: '08:30:00',
+        routeId: 'route_64',
+        serviceId: 'svc_weekday',
+        routeShortName: '64',
       );
       expect(row.tripId, 'trip_1');
       expect(row.departureTime, '08:30:00');
@@ -736,11 +898,15 @@ void main() {
 
     test('creates with all optional fields', () {
       final row = DepartureRow(
-        tripId: 'trip_1', departureTime: '08:30:00',
+        tripId: 'trip_1',
+        departureTime: '08:30:00',
         stopHeadsign: 'Via Nazionale',
-        routeId: 'route_64', serviceId: 'svc_weekday',
-        tripHeadsign: 'Termini', directionId: 0,
-        routeShortName: '64', routeColor: 'FF0000',
+        routeId: 'route_64',
+        serviceId: 'svc_weekday',
+        tripHeadsign: 'Termini',
+        directionId: 0,
+        routeShortName: '64',
+        routeColor: 'FF0000',
       );
       expect(row.stopHeadsign, 'Via Nazionale');
       expect(row.tripHeadsign, 'Termini');
