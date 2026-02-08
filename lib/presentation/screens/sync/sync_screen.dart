@@ -61,6 +61,24 @@ class _SyncScreenState extends ConsumerState<SyncScreen> {
     );
   }
 
+  String _friendlyError(String? raw) {
+    if (raw == null) return 'Unknown error';
+    final lower = raw.toLowerCase();
+    if (lower.contains('host lookup') ||
+        lower.contains('no address associated') ||
+        lower.contains('socketexception') ||
+        lower.contains('failed to download')) {
+      return 'No internet connection.\nPlease check your network and try again.';
+    }
+    if (lower.contains('timeout') || lower.contains('timed out')) {
+      return 'Connection timed out.\nThe server may be slow — try again later.';
+    }
+    if (lower.contains('status: 5') || lower.contains('status: 503')) {
+      return 'Server is temporarily unavailable.\nTry again in a few minutes.';
+    }
+    return 'Download failed.';
+  }
+
   String _stageLabel(BuildContext context, SyncStage stage) {
     final l10n = AppLocalizations.of(context)!;
     switch (stage) {
@@ -143,17 +161,27 @@ class _SyncScreenState extends ConsumerState<SyncScreen> {
                 ),
               ] else ...[
                 Icon(
-                  Icons.error_outline,
+                  Icons.cloud_off,
                   size: 48,
                   color: theme.colorScheme.error,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _currentProgress.errorMessage ?? 'Unknown error',
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  _friendlyError(_currentProgress.errorMessage),
+                  style: theme.textTheme.titleSmall?.copyWith(
                     color: theme.colorScheme.error,
                   ),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _currentProgress.errorMessage ?? '',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(

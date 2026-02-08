@@ -60,8 +60,7 @@ class MockGtfsRepository implements GtfsRepository {
   Future<List<RouteEntity>> getRoutesForStop(String stopId) async => [];
 
   @override
-  Future<bool> isFavorite(String stopId) async =>
-      favorites.contains(stopId);
+  Future<bool> isFavorite(String stopId) async => favorites.contains(stopId);
 
   @override
   Future<void> addFavorite(String stopId) async {
