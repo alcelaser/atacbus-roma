@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.atacbus" "\0"
-            VALUE "FileDescription", "atacbus_roma" "\0"
+            VALUE "FileDescription", "BUS - Roma" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "atacbus_roma" "\0"
+            VALUE "InternalName", "bus_roma" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.atacbus. All rights reserved." "\0"
             VALUE "OriginalFilename", "atacbus_roma.exe" "\0"
-            VALUE "ProductName", "atacbus_roma" "\0"
+            VALUE "ProductName", "BUS - Roma" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

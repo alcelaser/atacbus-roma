@@ -6,15 +6,15 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'presentation/providers/theme_provider.dart';
 
-class AtacBusApp extends ConsumerWidget {
-  const AtacBusApp({super.key});
+class BusRomaApp extends ConsumerWidget {
+  const BusRomaApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'ATAC Bus Roma',
+      title: 'BUS - Roma',
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
       themeMode: themeMode,

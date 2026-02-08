@@ -1,6 +1,6 @@
 {
-    "name": "atacbus_roma",
-    "short_name": "atacbus_roma",
+    "name": "BUS - Roma",
+    "short_name": "BUS - Roma",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

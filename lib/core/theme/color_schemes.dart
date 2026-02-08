@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Defines the light and dark [ColorScheme] objects for the ATAC Bus Roma app.
+/// Defines the light and dark [ColorScheme] objects for the BUS - Roma app.
 ///
 /// The palette is inspired by the colours of Rome:
 /// - **Dark Red (#8B0000)** – evoking terracotta, ancient brick, and the

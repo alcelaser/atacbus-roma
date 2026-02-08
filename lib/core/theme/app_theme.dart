@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'color_schemes.dart';
 import 'text_theme.dart';
 
-/// Assembles the complete light and dark [ThemeData] for the ATAC Bus Roma
+/// Assembles the complete light and dark [ThemeData] for the BUS - Roma
 /// app, wiring together colour schemes, text themes, and component-level
 /// overrides.
 class AppTheme {

@@ -1,4 +1,4 @@
-# ATAC Bus Roma
+# BUS - Roma
 
 A Flutter application for browsing bus timetables and live arrival times for all ATAC stops in Rome. Built with Clean Architecture, Riverpod state management, and a Drift SQLite database. Consumes ATAC's publicly available GTFS static and GTFS-Realtime data feeds.
 
@@ -323,6 +323,7 @@ Testing strategy: unit tests use hand-rolled mock repositories implementing abst
 | v0.0.7 | `v0.0.7` | Alerts + Polish: service alert cards with route/stop chips, settings screen with theme toggle (light/dark/system), re-sync with confirmation dialog, last sync date display, about section, persistent theme mode via SharedPreferences |
 | v0.0.8 | `v0.0.8` | BOM fix + CSV parser hardening: fixed UTF-8 BOM stripping in GtfsCsvParser causing header mismatch during GTFS import |
 | v0.0.9 | `v0.0.9` | Database hardening + real integration tests: schema migration (v1→v2), composite `(stop_id, departure_time)` index, N+1 query elimination in `getStopsForRoute` (single JOIN), SQL injection prevention in LIKE queries, empty PK validation in all 7 CSV parsers, cache invalidation after sync, 90 real-DB integration tests using in-memory SQLite |
+| v0.0.10 | `v0.0.10` | Rebrand to BUS - Roma: app renamed from ATAC Bus Roma to BUS - Roma across all platforms (Android, iOS, web, Linux, Windows), custom app icon, version bump to 0.0.10 |
 
 ## Roadmap
 

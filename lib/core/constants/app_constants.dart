@@ -1,8 +1,8 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'ATAC Bus Roma';
-  static const String appVersion = '0.0.8';
+  static const String appName = 'BUS - Roma';
+  static const String appVersion = '0.0.10';
   static const int dbBatchSize = 5000;
   static const double defaultLatitude = 41.9028;
   static const double defaultLongitude = 12.4964;

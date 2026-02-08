@@ -1,7 +1,7 @@
 name: atacbus_roma
-description: "ATAC Bus Roma - Bus timetables and live arrivals for Rome"
+description: "BUS - Roma: Bus timetables and live arrivals for Rome"
 publish_to: 'none'
-version: 0.0.1+1
+version: 0.0.10+10
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
