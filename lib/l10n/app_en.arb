@@ -1,0 +1,105 @@
+{
+  "@@locale": "en",
+  "appTitle": "ATAC Bus Roma",
+  "home": "Home",
+  "lines": "Lines",
+  "map": "Map",
+  "alerts": "Alerts",
+  "settings": "Settings",
+  "search": "Search",
+  "searchStops": "Search stops...",
+  "searchStopsByNameOrCode": "Search by stop name or code",
+  "favorites": "Favorites",
+  "nearbyStops": "Nearby Stops",
+  "noFavorites": "No favorite stops yet",
+  "noNearbyStops": "No nearby stops found",
+  "departures": "Departures",
+  "noDepartures": "No upcoming departures",
+  "scheduledTime": "Scheduled",
+  "liveTime": "Live",
+  "minutesShort": "min",
+  "now": "Now",
+  "offline": "Offline - showing scheduled times",
+  "allLines": "All Lines",
+  "bus": "Bus",
+  "tram": "Tram",
+  "metro": "Metro",
+  "routeStops": "Route Stops",
+  "showOnMap": "Show on Map",
+  "serviceAlerts": "Service Alerts",
+  "noAlerts": "No active alerts",
+  "settingsTitle": "Settings",
+  "theme": "Theme",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "themeSystem": "System",
+  "language": "Language",
+  "syncData": "Sync GTFS Data",
+  "syncDataDescription": "Re-download timetable data",
+  "lastSync": "Last sync: {date}",
+  "@lastSync": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "about": "About",
+  "version": "Version {version}",
+  "@version": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "syncTitle": "Downloading Timetable Data",
+  "syncDownloading": "Downloading GTFS data...",
+  "syncExtracting": "Extracting files...",
+  "syncImporting": "Importing timetables...",
+  "syncImportingTable": "Importing {table}...",
+  "@syncImportingTable": {
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  },
+  "syncComplete": "Data sync complete!",
+  "syncError": "Error syncing data: {error}",
+  "@syncError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "syncRetry": "Retry",
+  "stopCode": "Stop {code}",
+  "@stopCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "direction": "Direction: {direction}",
+  "@direction": {
+    "placeholders": {
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "delayed": "Delayed",
+  "onTime": "On time",
+  "early": "Early",
+  "cancel": "Cancel",
+  "ok": "OK",
+  "error": "Error",
+  "loading": "Loading...",
+  "refresh": "Refresh",
+  "noResults": "No results found",
+  "locationPermissionDenied": "Location permission denied",
+  "locationServiceDisabled": "Location services are disabled"
+}
