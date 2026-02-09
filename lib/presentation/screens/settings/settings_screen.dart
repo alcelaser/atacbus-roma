@@ -106,10 +106,10 @@ class SettingsScreen extends ConsumerWidget {
             title: Text(l10n.appTitle),
             subtitle: Text(l10n.version(AppConstants.appVersion)),
           ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Data source'),
-            subtitle: const Text('ATAC Roma GTFS (romamobilita.it)'),
+          const ListTile(
+            leading: Icon(Icons.description_outlined),
+            title: Text('Data source'),
+            subtitle: Text('ATAC Roma GTFS (romamobilita.it)'),
           ),
         ],
       ),

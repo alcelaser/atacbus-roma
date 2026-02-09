@@ -1033,7 +1033,7 @@ void main() {
         97200, // 27:00:00 (3:00 AM) - upcoming
       ];
 
-      final cutoff = twoAmSeconds + 5400; // 90 min window
+      const cutoff = twoAmSeconds + 5400; // 90 min window
       final upcoming = afterMidnightDepartures
           .where((s) => s >= twoAmSeconds && s <= cutoff)
           .toList();

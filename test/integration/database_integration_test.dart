@@ -1999,8 +1999,8 @@ void main() {
     });
 
     test('filtering stops within 1 km radius', () {
-      final userLat = 41.9009;
-      final userLon = 12.5016;
+      const userLat = 41.9009;
+      const userLon = 12.5016;
       final stops = [
         const Stop(
             stopId: 'near',
@@ -2034,8 +2034,8 @@ void main() {
     });
 
     test('nearby stops are sorted by distance', () {
-      final userLat = 41.9009;
-      final userLon = 12.5016;
+      const userLat = 41.9009;
+      const userLon = 12.5016;
       final stops = [
         const Stop(
             stopId: 'mid', stopName: 'Mid', stopLat: 41.9050, stopLon: 12.5080),

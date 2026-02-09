@@ -4,7 +4,6 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../../domain/entities/stop.dart';
 import '../../../domain/entities/route_entity.dart';
-import '../../../domain/entities/service_alert.dart';
 import '../../providers/gtfs_providers.dart';
 import '../../widgets/line_badge.dart';
 
@@ -190,9 +189,9 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen> {
                 (routeId: widget.routeId, directionId: dirId),
               ));
               final label = headsignAsync.when(
-                data: (h) => h ?? '${l10n.direction(dirId.toString())}',
+                data: (h) => h ?? l10n.direction(dirId.toString()),
                 loading: () => '...',
-                error: (_, __) => '${l10n.direction(dirId.toString())}',
+                error: (_, __) => l10n.direction(dirId.toString()),
               );
 
               return Expanded(

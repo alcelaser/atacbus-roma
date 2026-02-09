@@ -426,7 +426,7 @@ class _ItineraryCard extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          '$depTime',
+          depTime,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -440,7 +440,7 @@ class _ItineraryCard extends StatelessWidget {
           ),
         ),
         Text(
-          '$arrTime',
+          arrTime,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
