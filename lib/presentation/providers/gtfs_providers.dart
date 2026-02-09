@@ -11,10 +11,12 @@ import '../../domain/entities/departure.dart';
 import '../../domain/entities/route_entity.dart';
 import '../../domain/entities/vehicle.dart';
 import '../../domain/entities/service_alert.dart';
+import '../../domain/entities/trip_plan.dart';
 import '../../domain/repositories/realtime_repository.dart';
 import '../../domain/usecases/search_stops.dart';
 import '../../domain/usecases/get_stop_departures.dart';
 import '../../domain/usecases/toggle_favorite.dart';
+import '../../domain/usecases/plan_trip.dart';
 import 'sync_provider.dart';
 
 final gtfsRepositoryProvider = Provider<GtfsRepositoryImpl>((ref) {
@@ -199,4 +201,50 @@ final directionHeadsignProvider =
         (ref, params) async {
   final repo = ref.watch(gtfsRepositoryProvider);
   return repo.getHeadsignForDirection(params.routeId, params.directionId);
+});
+
+// ─── Trip planning ───────────────────────────────────────────────
+
+/// Selected origin stop for trip planning.
+final tripOriginProvider = StateProvider<Stop?>((ref) => null);
+
+/// Selected destination stop for trip planning.
+final tripDestinationProvider = StateProvider<Stop?>((ref) => null);
+
+/// Search query for origin stop input.
+final originSearchQueryProvider = StateProvider<String>((ref) => '');
+
+/// Search query for destination stop input.
+final destinationSearchQueryProvider = StateProvider<String>((ref) => '');
+
+/// Search results for origin stop autocomplete.
+final originSearchResultsProvider = FutureProvider<List<Stop>>((ref) async {
+  final query = ref.watch(originSearchQueryProvider);
+  if (query.trim().isEmpty) return [];
+  final searchStops = ref.watch(searchStopsProvider);
+  return searchStops(query);
+});
+
+/// Search results for destination stop autocomplete.
+final destinationSearchResultsProvider =
+    FutureProvider<List<Stop>>((ref) async {
+  final query = ref.watch(destinationSearchQueryProvider);
+  if (query.trim().isEmpty) return [];
+  final searchStops = ref.watch(searchStopsProvider);
+  return searchStops(query);
+});
+
+/// PlanTrip use case provider.
+final planTripProvider = Provider<PlanTrip>((ref) {
+  return PlanTrip(ref.watch(gtfsRepositoryProvider));
+});
+
+/// Trip plan result: watches origin + destination, runs trip planning.
+final tripPlanResultProvider =
+    FutureProvider<TripPlanResult?>((ref) async {
+  final origin = ref.watch(tripOriginProvider);
+  final destination = ref.watch(tripDestinationProvider);
+  if (origin == null || destination == null) return null;
+  final planTrip = ref.watch(planTripProvider);
+  return planTrip(origin.stopId, destination.stopId);
 });

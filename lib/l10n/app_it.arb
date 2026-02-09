@@ -76,5 +76,17 @@
   "expressBus": "Bus Espresso",
   "suburbanBus": "Bus Suburbano",
   "activeAlert": "avviso attivo",
-  "activeAlerts": "avvisi attivi"
+  "activeAlerts": "avvisi attivi",
+  "navigate": "Naviga",
+  "from": "Da...",
+  "to": "A...",
+  "useMyLocation": "Usa la mia posizione",
+  "swapStops": "Inverti",
+  "noRoutesFound": "Nessun percorso trovato tra queste fermate",
+  "selectStops": "Seleziona partenza e arrivo per pianificare un viaggio",
+  "direct": "Diretto",
+  "transfer": "Cambio",
+  "transferAt": "Cambio a {stop}",
+  "nStops": "{count} fermate",
+  "totalDuration": "{minutes} min"
 }

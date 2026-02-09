@@ -132,6 +132,32 @@ class DepartureRow {
   });
 }
 
+// ─── Direct trip row (for trip planning) ──────────────────────────
+
+class DirectTripRow {
+  final String tripId;
+  final String departureTime;
+  final String arrivalTime;
+  final int depSequence;
+  final int arrSequence;
+  final String routeId;
+  final String routeShortName;
+  final String? routeColor;
+  final String? tripHeadsign;
+
+  DirectTripRow({
+    required this.tripId,
+    required this.departureTime,
+    required this.arrivalTime,
+    required this.depSequence,
+    required this.arrSequence,
+    required this.routeId,
+    required this.routeShortName,
+    this.routeColor,
+    this.tripHeadsign,
+  });
+}
+
 // ─── Database ─────────────────────────────────────────────────────
 
 @DriftDatabase(tables: [
@@ -193,6 +219,9 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_shapes_shape_id ON gtfs_shapes(shape_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_stop_times_stop_seq ON gtfs_stop_times(stop_id, stop_sequence)',
     );
   }
 
@@ -561,6 +590,113 @@ class AppDatabase extends _$AppDatabase {
     return (select(favoriteStops)
           ..orderBy([(f) => OrderingTerm.desc(f.addedAt)]))
         .watch();
+  }
+
+  // ─── Trip planning queries ──────────────────────────────────────
+
+  /// Find trips that visit both origin and destination stops (direct routes).
+  Future<List<DirectTripRow>> findDirectTrips(
+    String originStopId,
+    String destinationStopId,
+    Set<String> serviceIds,
+  ) async {
+    if (serviceIds.isEmpty) return [];
+
+    final placeholders = List.filled(serviceIds.length, '?').join(', ');
+    final query = '''
+      SELECT
+        st1.trip_id,
+        st1.departure_time,
+        st2.arrival_time,
+        st1.stop_sequence AS dep_sequence,
+        st2.stop_sequence AS arr_sequence,
+        t.route_id,
+        r.route_short_name,
+        r.route_color,
+        t.trip_headsign
+      FROM gtfs_stop_times st1
+      INNER JOIN gtfs_stop_times st2 ON st1.trip_id = st2.trip_id
+      INNER JOIN gtfs_trips t ON t.trip_id = st1.trip_id
+      INNER JOIN gtfs_routes r ON r.route_id = t.route_id
+      WHERE st1.stop_id = ?
+        AND st2.stop_id = ?
+        AND st1.stop_sequence < st2.stop_sequence
+        AND t.service_id IN ($placeholders)
+      ORDER BY st1.departure_time
+    ''';
+
+    final vars = [
+      Variable.withString(originStopId),
+      Variable.withString(destinationStopId),
+      ...serviceIds.map((id) => Variable.withString(id)),
+    ];
+
+    final results = await customSelect(query, variables: vars).get();
+
+    return results
+        .map((row) => DirectTripRow(
+              tripId: row.read<String>('trip_id'),
+              departureTime: row.read<String>('departure_time'),
+              arrivalTime: row.read<String>('arrival_time'),
+              depSequence: row.read<int>('dep_sequence'),
+              arrSequence: row.read<int>('arr_sequence'),
+              routeId: row.read<String>('route_id'),
+              routeShortName: row.read<String>('route_short_name'),
+              routeColor: row.readNullable<String>('route_color'),
+              tripHeadsign: row.readNullable<String>('trip_headsign'),
+            ))
+        .toList();
+  }
+
+  /// Get distinct route IDs that serve a given stop.
+  Future<List<String>> getRouteIdsForStop(
+    String stopId,
+    Set<String> serviceIds,
+  ) async {
+    if (serviceIds.isEmpty) return [];
+
+    final placeholders = List.filled(serviceIds.length, '?').join(', ');
+    final query = '''
+      SELECT DISTINCT t.route_id
+      FROM gtfs_stop_times st
+      INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+      WHERE st.stop_id = ?
+        AND t.service_id IN ($placeholders)
+    ''';
+
+    final vars = [
+      Variable.withString(stopId),
+      ...serviceIds.map((id) => Variable.withString(id)),
+    ];
+
+    final results = await customSelect(query, variables: vars).get();
+    return results.map((r) => r.read<String>('route_id')).toList();
+  }
+
+  /// Get distinct stop IDs served by any of the given routes.
+  Future<List<String>> getStopIdsForRoutes(
+    List<String> routeIds,
+    Set<String> serviceIds,
+  ) async {
+    if (routeIds.isEmpty || serviceIds.isEmpty) return [];
+
+    final routePlaceholders = List.filled(routeIds.length, '?').join(', ');
+    final servicePlaceholders = List.filled(serviceIds.length, '?').join(', ');
+    final query = '''
+      SELECT DISTINCT st.stop_id
+      FROM gtfs_stop_times st
+      INNER JOIN gtfs_trips t ON t.trip_id = st.trip_id
+      WHERE t.route_id IN ($routePlaceholders)
+        AND t.service_id IN ($servicePlaceholders)
+    ''';
+
+    final vars = [
+      ...routeIds.map((id) => Variable.withString(id)),
+      ...serviceIds.map((id) => Variable.withString(id)),
+    ];
+
+    final results = await customSelect(query, variables: vars).get();
+    return results.map((r) => r.read<String>('stop_id')).toList();
   }
 
   // ─── Stats (for verifying sync) ───────────────────────────────

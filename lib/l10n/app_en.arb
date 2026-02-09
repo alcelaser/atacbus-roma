@@ -118,5 +118,38 @@
   "expressBus": "Express Bus",
   "suburbanBus": "Suburban Bus",
   "activeAlert": "active alert",
-  "activeAlerts": "active alerts"
+  "activeAlerts": "active alerts",
+  "navigate": "Navigate",
+  "from": "From...",
+  "to": "To...",
+  "useMyLocation": "Use my location",
+  "swapStops": "Swap",
+  "noRoutesFound": "No routes found between these stops",
+  "selectStops": "Select origin and destination to plan a trip",
+  "direct": "Direct",
+  "transfer": "Transfer",
+  "transferAt": "Transfer at {stop}",
+  "@transferAt": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "nStops": "{count} stops",
+  "@nStops": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "totalDuration": "{minutes} min",
+  "@totalDuration": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
 }

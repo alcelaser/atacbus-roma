@@ -11,8 +11,7 @@ class RouteBrowserScreen extends ConsumerStatefulWidget {
   const RouteBrowserScreen({super.key});
 
   @override
-  ConsumerState<RouteBrowserScreen> createState() =>
-      _RouteBrowserScreenState();
+  ConsumerState<RouteBrowserScreen> createState() => _RouteBrowserScreenState();
 }
 
 class _RouteBrowserScreenState extends ConsumerState<RouteBrowserScreen> {

@@ -51,6 +51,21 @@ class GtfsRepositoryImpl implements GtfsRepository {
         routeTextColor: r.routeTextColor,
       );
 
+  // ─── Service ID resolution ─────────────────────────────────
+
+  /// Resolves today's active service IDs with fallback.
+  Future<Set<String>> _getActiveServiceIdsForToday() async {
+    final serviceDate = DateTimeUtils.getServiceDate();
+    final dateStr = DateTimeUtils.toGtfsDate(serviceDate);
+    final weekday = serviceDate.weekday;
+
+    var activeServiceIds = await _getCachedServiceIds(dateStr, weekday);
+    if (activeServiceIds.isEmpty) {
+      activeServiceIds = await _db.getAllServiceIds();
+    }
+    return activeServiceIds;
+  }
+
   // ─── Stops ──────────────────────────────────────────────────
 
   @override
@@ -102,20 +117,9 @@ class GtfsRepositoryImpl implements GtfsRepository {
 
   @override
   Future<List<Departure>> getScheduledDepartures(String stopId) async {
-    // 1. Determine active service IDs for today (cached per date)
-    final serviceDate = DateTimeUtils.getServiceDate();
-    final dateStr = DateTimeUtils.toGtfsDate(serviceDate);
-    final weekday = serviceDate.weekday;
+    final activeServiceIds = await _getActiveServiceIdsForToday();
 
-    var activeServiceIds = await _getCachedServiceIds(dateStr, weekday);
-
-    // 2. Fallback: if calendar doesn't cover today (expired data),
-    //    use all service IDs so the user still sees times.
-    if (activeServiceIds.isEmpty) {
-      activeServiceIds = await _db.getAllServiceIds();
-    }
-
-    // 3. Single JOIN query: stop_times + trips + routes
+    // Single JOIN query: stop_times + trips + routes
     final rows = await _db.getDeparturesForStop(stopId, activeServiceIds);
     if (rows.isEmpty) {
       // Last resort: try with no service filter at all
@@ -248,6 +252,29 @@ class GtfsRepositoryImpl implements GtfsRepository {
   Future<List<RouteEntity>> getRoutesForStop(String stopId) async {
     final results = await _db.getRoutesForStopJoin(stopId);
     return results.map(_mapRoute).toList();
+  }
+
+  // ─── Trip planning ────────────────────────────────────────────
+
+  /// Find direct trips between two stops for today's service.
+  Future<List<DirectTripRow>> findDirectTrips(
+    String originStopId,
+    String destinationStopId,
+  ) async {
+    final serviceIds = await _getActiveServiceIdsForToday();
+    return _db.findDirectTrips(originStopId, destinationStopId, serviceIds);
+  }
+
+  /// Get route IDs serving a stop for today's service.
+  Future<List<String>> getRouteIdsForStop(String stopId) async {
+    final serviceIds = await _getActiveServiceIdsForToday();
+    return _db.getRouteIdsForStop(stopId, serviceIds);
+  }
+
+  /// Get stop IDs reachable from a set of routes for today's service.
+  Future<List<String>> getStopIdsForRoutes(List<String> routeIds) async {
+    final serviceIds = await _getActiveServiceIdsForToday();
+    return _db.getStopIdsForRoutes(routeIds, serviceIds);
   }
 
   // ─── Favorites ──────────────────────────────────────────────

@@ -5,6 +5,7 @@ import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/stop_detail/stop_detail_screen.dart';
 import '../../presentation/screens/route_browser/route_browser_screen.dart';
 import '../../presentation/screens/route_detail/route_detail_screen.dart';
+import '../../presentation/screens/navigate/navigate_screen.dart';
 import '../../presentation/screens/map/map_screen.dart';
 import '../../presentation/screens/alerts/alerts_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
@@ -33,6 +34,12 @@ final GoRouter appRouter = GoRouter(
           path: '/routes',
           pageBuilder: (context, state) => const NoTransitionPage(
             child: RouteBrowserScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/navigate',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: NavigateScreen(),
           ),
         ),
         GoRoute(
@@ -87,8 +94,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
     final location = GoRouterState.of(context).uri.path;
     if (location == '/') return 0;
     if (location.startsWith('/routes')) return 1;
-    if (location.startsWith('/map')) return 2;
-    if (location.startsWith('/alerts')) return 3;
+    if (location.startsWith('/navigate')) return 2;
+    if (location.startsWith('/map')) return 3;
+    if (location.startsWith('/alerts')) return 4;
     return 0;
   }
 
@@ -106,8 +114,10 @@ class ScaffoldWithNavBar extends StatelessWidget {
             case 1:
               context.go('/routes');
             case 2:
-              context.go('/map');
+              context.go('/navigate');
             case 3:
+              context.go('/map');
+            case 4:
               context.go('/alerts');
           }
         },
@@ -121,6 +131,11 @@ class ScaffoldWithNavBar extends StatelessWidget {
             icon: const Icon(Icons.directions_bus_outlined),
             selectedIcon: const Icon(Icons.directions_bus),
             label: l10n.lines,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.alt_route_outlined),
+            selectedIcon: const Icon(Icons.alt_route),
+            label: l10n.navigate,
           ),
           NavigationDestination(
             icon: const Icon(Icons.map_outlined),

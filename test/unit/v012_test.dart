@@ -289,9 +289,7 @@ void main() {
       const ServiceAlert(
           alertId: 'a2', headerText: 'Route 40 disruption', routeIds: ['40']),
       const ServiceAlert(
-          alertId: 'a3',
-          headerText: 'Multiple routes',
-          routeIds: ['64', '40']),
+          alertId: 'a3', headerText: 'Multiple routes', routeIds: ['64', '40']),
       const ServiceAlert(
           alertId: 'a4', headerText: 'General alert', routeIds: []),
     ];

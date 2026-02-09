@@ -2,7 +2,7 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'BUS - Roma';
-  static const String appVersion = '0.0.12';
+  static const String appVersion = '0.0.13';
   static const int dbBatchSize = 5000;
   static const double defaultLatitude = 41.9028;
   static const double defaultLongitude = 12.4964;
