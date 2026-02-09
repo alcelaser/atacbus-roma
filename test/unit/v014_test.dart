@@ -8,12 +8,12 @@ import 'package:atacbus_roma/domain/entities/stop_time_detail.dart';
 
 void main() {
   // ─── Version ─────────────────────────────────────────────────
-  test('version is 0.0.14', () {
-    expect(AppConstants.appVersion, '0.0.14');
+  test('version is 0.0.15', () {
+    expect(AppConstants.appVersion, '0.0.15');
   });
 
-  test('tripPlanNearbyRadiusMeters is 500', () {
-    expect(AppConstants.tripPlanNearbyRadiusMeters, 500.0);
+  test('tripPlanNearbyRadiusMeters is 1000', () {
+    expect(AppConstants.tripPlanNearbyRadiusMeters, 1000.0);
   });
 
   // ─── AMOLED theme ─────────────────────────────────────────────
