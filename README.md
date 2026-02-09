@@ -18,9 +18,9 @@ The project follows **Clean Architecture** with three layers:
 
 **State management**: `flutter_riverpod` 2.x with standard `Provider`, `FutureProvider`, `FutureProvider.family`, `StateProvider`, and `StreamProvider` (no code generation / `@riverpod` annotation).
 
-**Navigation**: `go_router` with a `ShellRoute` wrapping the four main tabs (Home, Lines, Map, Alerts) in a `NavigationBar`. Stop detail, settings, and sync routes live outside the shell as full-screen pushes.
+**Navigation**: `go_router` with a `ShellRoute` wrapping the five main tabs (Home, Lines, Navigate, Map, Alerts) in a `NavigationBar`. Stop detail, settings, sync, and trip detail routes live outside the shell as full-screen pushes.
 
-**Database**: `drift` (SQLite) with 8 tables, 9 performance indexes (including composite `(stop_id, departure_time)` for fast departure lookups), batch inserts (5000 rows/transaction), schema migration (v1→v2), and code-generated data classes via `build_runner`. In-memory caching in `GtfsRepositoryImpl` for all-stops, all-routes, and active service IDs (auto-refreshes per service date). SQL injection prevention in LIKE queries. Empty primary key validation in CSV import pipeline.
+**Database**: `drift` (SQLite) with 9 tables, 9 performance indexes (including composite `(stop_id, departure_time)` for fast departure lookups), batch inserts (5000 rows/transaction), schema migration (v1→v3), and code-generated data classes via `build_runner`. In-memory caching in `GtfsRepositoryImpl` for all-stops, all-routes, and active service IDs (auto-refreshes per service date). SQL injection prevention in LIKE queries. Empty primary key validation in CSV import pipeline.
 
 ## Data Sources
 
@@ -96,6 +96,9 @@ lib/
       vehicle.dart                   #   Vehicle (tripId, lat, lon, bearing, speed)
       service_alert.dart             #   ServiceAlert (headerText, descriptionText, routeIds, stopIds)
       favorite_stop.dart             #   FavoriteStop (stopId, addedAt)
+      favorite_route.dart            #   FavoriteRouteEntity (originLat/Lon, destStopId, addedAt)
+      stop_time_detail.dart          #   StopTimeDetail (stopId, stopName, arrivalTime, departureTime, sequence)
+      trip_plan.dart                 #   TripLeg (transit or walking), TripItinerary, TripPlanResult
     repositories/                    # Abstract interfaces:
       gtfs_repository.dart           #   searchStops, getScheduledDepartures, favorites, routes
       realtime_repository.dart       #   getTripDelays, getVehiclePositions, getServiceAlerts
@@ -106,16 +109,19 @@ lib/
       get_routes_for_stop.dart       # All routes serving a stop
       toggle_favorite.dart           # Check -> flip -> return new state
       sync_gtfs_data.dart            # Wraps SyncRepositoryImpl stream
+      plan_trip.dart                 # Multi-stop trip planning: direct, same-stop transfer, walking transfer
   presentation/
     providers/
       sync_provider.dart             # databaseProvider, preferencesStorageProvider, syncRepositoryProvider, hasCompletedSyncProvider
       gtfs_providers.dart            # gtfsRepositoryProvider, realtimeRepositoryProvider, connectivityProvider, isOnlineProvider, searchResultsProvider, stopDeparturesProvider, favoriteStopIdsProvider, ...
       theme_provider.dart            # themeModeProvider (StateNotifier), lastSyncDateProvider, persists theme to SharedPreferences
     screens/
-      home/home_screen.dart          # Search bar (live results), favorites with live departure countdown + LIVE badges, nearby stops within 1 km (GPS)
+      home/home_screen.dart          # Search bar (live results), favorites with live departure countdown + LIVE badges, nearby stops within 1 km (GPS), refresh button
       stop_detail/stop_detail_screen.dart  # Departure list, RT auto-refresh (30s), offline banner, favorite toggle, pull-to-refresh
       route_browser/route_browser_screen.dart  # Tabbed route list (All/Bus/Tram/Metro), LineBadge, tap to route detail
       route_detail/route_detail_screen.dart  # Route info + ordered stop list with timeline indicator, direction toggle (outbound/inbound), tap to stop detail
+      navigate/navigate_screen.dart  # GPS/stop origin, destination search, trip planning, favorite routes, walking transfers
+      trip_detail/trip_detail_screen.dart  # Leg timeline with intermediate stops, walking segments, transfer indicators
       map/map_screen.dart            # flutter_map + OSM tiles, stop markers, live vehicle positions, user GPS location, bottom sheet stop info
       alerts/alerts_screen.dart      # Service alert cards with route/stop chips, offline banner, pull-to-refresh
       settings/settings_screen.dart  # Theme toggle (system/light/dark), re-sync with confirmation, last sync date, about
@@ -144,7 +150,7 @@ test/
 
 ## Database Schema
 
-8 Drift tables with composite primary keys where appropriate:
+9 Drift tables with composite primary keys where appropriate:
 
 | Table | PK | Rows (Rome) | Key Indexes |
 |-------|-----|-------------|-------------|
@@ -156,6 +162,7 @@ test/
 | `gtfs_calendar_dates` | `(service_id, date)` | ~3,000 | `date`, `service_id` |
 | `gtfs_shapes` | `(shape_id, shape_pt_sequence)` | ~800,000 | `shape_id` |
 | `favorite_stops` | `stop_id` | user data | - |
+| `favorite_routes` | `id` (auto) | user data | - |
 
 Import uses batch inserts of 5000 rows per transaction to handle the 1M+ `stop_times` rows without exhausting memory.
 
@@ -222,12 +229,12 @@ StopDetailScreen (30s auto-refresh via Timer.periodic)
 
 Material 3 with an explicit `ColorScheme` constructor (not `fromSeed`):
 
-| Token | Light | Dark |
+| Token | Light | Dark (AMOLED) |
 |-------|-------|------|
-| Primary | `#8B0000` (dark red) | `#FFB4AA` (soft salmon) |
+| Primary | `#8B0000` (dark red) | `#FF6B5A` (vibrant terracotta) |
 | Primary Container | `#FFDAD5` | `#8B0000` |
 | Secondary | `#DAA520` (gold) | `#FFD700` (bright gold) |
-| Surface | `#FFFBFF` (warm ivory) | `#201A19` (warm charcoal) |
+| Surface | `#FFFBFF` (warm ivory) | `#000000` (true black) |
 | Error | `#BA1A1A` | `#FFB4AB` |
 
 `NavigationBar` indicator uses the secondary (gold) color. Cards have 12px border radius.
@@ -325,6 +332,11 @@ Testing strategy: unit tests use hand-rolled mock repositories implementing abst
 | v0.0.9 | `v0.0.9` | Database hardening + real integration tests: schema migration (v1→v2), composite `(stop_id, departure_time)` index, N+1 query elimination in `getStopsForRoute` (single JOIN), SQL injection prevention in LIKE queries, empty PK validation in all 7 CSV parsers, cache invalidation after sync, 90 real-DB integration tests using in-memory SQLite |
 | v0.0.10 | `v0.0.10` | Rebrand to BUS - Roma: app renamed from ATAC Bus Roma to BUS - Roma across all platforms (Android, iOS, web, Linux, Windows), custom app icon, version bump to 0.0.10 |
 | v0.0.11 | `v0.0.11` | Nearby stops + direction toggle: home screen shows closest stops within 1 km using GPS, route detail screen adds direction toggle (outbound/inbound) with headsign labels, updated nearby radius to 1 km |
+| v0.0.12 | `v0.0.12` | Line alerts, search, categorization, theme fix, nearby departures |
+| v0.0.13 | `v0.0.13` | Navigate tab with trip planning (direct + 1-transfer) |
+| v0.0.14 | `v0.0.14` | GPS trip planning, trip detail view, favorite routes, AMOLED theme |
+| v0.0.15 | `v0.0.15` | Expand trip planning nearby radius to 1km for origin and destination |
+| v0.0.16 | `v0.0.16` | Walking transfers: walk up to 700m between stops during transfers, walking leg UI in navigate + trip detail screens |
 
 ## Roadmap
 

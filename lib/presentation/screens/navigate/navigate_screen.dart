@@ -534,16 +534,24 @@ class _ItineraryCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: itinerary.isDirect
                           ? theme.colorScheme.primaryContainer
-                          : theme.colorScheme.tertiaryContainer,
+                          : itinerary.hasWalkingTransfer
+                              ? theme.colorScheme.secondaryContainer
+                              : theme.colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      itinerary.isDirect ? l10n.direct : l10n.transfer,
+                      itinerary.isDirect
+                          ? l10n.direct
+                          : itinerary.hasWalkingTransfer
+                              ? l10n.walkingTransfer
+                              : l10n.transfer,
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: itinerary.isDirect
                             ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onTertiaryContainer,
+                            : itinerary.hasWalkingTransfer
+                                ? theme.colorScheme.onSecondaryContainer
+                                : theme.colorScheme.onTertiaryContainer,
                       ),
                     ),
                   ),
@@ -567,10 +575,45 @@ class _ItineraryCard extends StatelessWidget {
               ...itinerary.legs.asMap().entries.map((entry) {
                 final index = entry.key;
                 final leg = entry.value;
+                // Walking legs are shown as transfer indicators, not as leg rows
+                if (leg.isWalking) {
+                  final walkMin = leg.durationSeconds ~/ 60;
+                  final distMeters = leg.walkingDistanceMeters?.round() ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.directions_walk,
+                          size: 16,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${l10n.walkTo(leg.alightStopName)} (${l10n.walkDistance(distMeters)})',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.secondary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '~$walkMin min',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (index > 0) ...[
+                    if (index > 0 && !itinerary.legs[index - 1].isWalking) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(

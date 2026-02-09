@@ -114,5 +114,22 @@
         "type": "int"
       }
     }
-  }
+  },
+  "walkTo": "Cammina fino a {stop}",
+  "@walkTo": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "walkDistance": "{meters}m a piedi",
+  "@walkDistance": {
+    "placeholders": {
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
+  "walkingTransfer": "Trasbordo a piedi"
 }

@@ -302,6 +302,7 @@ final tripPlanResultProvider =
     destStopIds: destStopIds,
     originName: origin.name,
     destinationName: destination.stopName,
+    allStops: allStops,
   );
 });
 

@@ -177,5 +177,22 @@
         "type": "int"
       }
     }
-  }
+  },
+  "walkTo": "Walk to {stop}",
+  "@walkTo": {
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "walkDistance": "{meters}m walk",
+  "@walkDistance": {
+    "placeholders": {
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
+  "walkingTransfer": "Walking Transfer"
 }

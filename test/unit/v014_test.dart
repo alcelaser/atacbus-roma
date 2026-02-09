@@ -8,8 +8,16 @@ import 'package:atacbus_roma/domain/entities/stop_time_detail.dart';
 
 void main() {
   // ─── Version ─────────────────────────────────────────────────
-  test('version is 0.0.15', () {
-    expect(AppConstants.appVersion, '0.0.15');
+  test('version is 0.0.16', () {
+    expect(AppConstants.appVersion, '0.0.16');
+  });
+
+  test('walkingTransferMaxMeters is 700', () {
+    expect(AppConstants.walkingTransferMaxMeters, 700.0);
+  });
+
+  test('walkingSpeedMps is 1.2', () {
+    expect(AppConstants.walkingSpeedMps, 1.2);
   });
 
   test('tripPlanNearbyRadiusMeters is 1000', () {
@@ -137,6 +145,124 @@ void main() {
       final waitSeconds =
           itinerary.legs[1].departureSeconds - itinerary.legs[0].arrivalSeconds;
       expect(waitSeconds, 300);
+    });
+  });
+
+  // ─── Walking transfer ───────────────────────────────────────────
+  group('Walking transfer', () {
+    test('TripLeg isWalking construction', () {
+      const walkLeg = TripLeg(
+        tripId: '',
+        routeId: '',
+        routeShortName: '',
+        boardStopId: 'X',
+        boardStopName: 'Stop X',
+        alightStopId: 'Y',
+        alightStopName: 'Stop Y',
+        departureSeconds: 36600,
+        arrivalSeconds: 37183,
+        boardSequence: 0,
+        alightSequence: 0,
+        isWalking: true,
+        walkingDistanceMeters: 700.0,
+      );
+      expect(walkLeg.isWalking, true);
+      expect(walkLeg.walkingDistanceMeters, 700.0);
+      expect(walkLeg.tripId, '');
+      expect(walkLeg.boardStopName, 'Stop X');
+      expect(walkLeg.alightStopName, 'Stop Y');
+    });
+
+    test('TripItinerary hasWalkingTransfer', () {
+      const transit1 = TripLeg(
+        tripId: 'trip1',
+        routeId: 'r1',
+        routeShortName: '64',
+        boardStopId: 'A',
+        boardStopName: 'Origin',
+        alightStopId: 'X',
+        alightStopName: 'Stop X',
+        departureSeconds: 36000,
+        arrivalSeconds: 36600,
+        boardSequence: 1,
+        alightSequence: 5,
+      );
+      const walk = TripLeg(
+        tripId: '',
+        routeId: '',
+        routeShortName: '',
+        boardStopId: 'X',
+        boardStopName: 'Stop X',
+        alightStopId: 'Y',
+        alightStopName: 'Stop Y',
+        departureSeconds: 36600,
+        arrivalSeconds: 37183,
+        boardSequence: 0,
+        alightSequence: 0,
+        isWalking: true,
+        walkingDistanceMeters: 700.0,
+      );
+      const transit2 = TripLeg(
+        tripId: 'trip2',
+        routeId: 'r2',
+        routeShortName: '40',
+        boardStopId: 'Y',
+        boardStopName: 'Stop Y',
+        alightStopId: 'C',
+        alightStopName: 'Destination',
+        departureSeconds: 37260,
+        arrivalSeconds: 37860,
+        boardSequence: 1,
+        alightSequence: 4,
+      );
+      const itinerary = TripItinerary(legs: [transit1, walk, transit2]);
+
+      expect(itinerary.hasWalkingTransfer, true);
+      expect(itinerary.hasTransfer, true);
+      expect(itinerary.isDirect, false);
+      expect(itinerary.legs.length, 3);
+      // transitLegs should exclude the walking leg
+      expect(itinerary.transitLegs.length, 2);
+    });
+
+    test('walking duration estimation (700m / 1.2 m/s)', () {
+      const distance = 700.0;
+      const speed = AppConstants.walkingSpeedMps; // 1.2
+      final walkSeconds = (distance / speed).round();
+      // 700 / 1.2 = 583.33... ≈ 583s
+      expect(walkSeconds, 583);
+    });
+
+    test('non-walking itinerary hasWalkingTransfer is false', () {
+      const leg1 = TripLeg(
+        tripId: 'trip1',
+        routeId: 'r1',
+        routeShortName: '64',
+        boardStopId: 'A',
+        boardStopName: 'Origin',
+        alightStopId: 'B',
+        alightStopName: 'Transfer',
+        departureSeconds: 36000,
+        arrivalSeconds: 36600,
+        boardSequence: 1,
+        alightSequence: 5,
+      );
+      const leg2 = TripLeg(
+        tripId: 'trip2',
+        routeId: 'r2',
+        routeShortName: '40',
+        boardStopId: 'B',
+        boardStopName: 'Transfer',
+        alightStopId: 'C',
+        alightStopName: 'Destination',
+        departureSeconds: 36900,
+        arrivalSeconds: 37500,
+        boardSequence: 1,
+        alightSequence: 4,
+      );
+      const itinerary = TripItinerary(legs: [leg1, leg2]);
+      expect(itinerary.hasWalkingTransfer, false);
+      expect(itinerary.transitLegs.length, 2);
     });
   });
 }

@@ -57,16 +57,24 @@ class TripDetailScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: itinerary.isDirect
                           ? theme.colorScheme.primaryContainer
-                          : theme.colorScheme.tertiaryContainer,
+                          : itinerary.hasWalkingTransfer
+                              ? theme.colorScheme.secondaryContainer
+                              : theme.colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      itinerary.isDirect ? l10n.direct : l10n.transfer,
+                      itinerary.isDirect
+                          ? l10n.direct
+                          : itinerary.hasWalkingTransfer
+                              ? l10n.walkingTransfer
+                              : l10n.transfer,
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: itinerary.isDirect
                             ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onTertiaryContainer,
+                            : itinerary.hasWalkingTransfer
+                                ? theme.colorScheme.onSecondaryContainer
+                                : theme.colorScheme.onTertiaryContainer,
                       ),
                     ),
                   ),
@@ -79,8 +87,12 @@ class TripDetailScreen extends ConsumerWidget {
           ...itinerary.legs.asMap().entries.expand((entry) {
             final legIndex = entry.key;
             final leg = entry.value;
+            if (leg.isWalking) {
+              return [_buildWalkingIndicator(context, leg)];
+            }
             return [
-              if (legIndex > 0) _buildTransferIndicator(context, leg, legIndex),
+              if (legIndex > 0 && !itinerary.legs[legIndex - 1].isWalking)
+                _buildTransferIndicator(context, leg, legIndex),
               _LegTimeline(leg: leg),
             ];
           }),
@@ -125,6 +137,61 @@ class TripDetailScreen extends ConsumerWidget {
           const Spacer(),
           Text(
             l10n.waitMinutes(waitMinutes),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalkingIndicator(BuildContext context, TripLeg walkLeg) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final walkMin = walkLeg.durationSeconds ~/ 60;
+    final distMeters = walkLeg.walkingDistanceMeters?.round() ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.directions_walk,
+              size: 18,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.walkTo(walkLeg.alightStopName),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+                Text(
+                  l10n.walkDistance(distMeters),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '~$walkMin min',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
