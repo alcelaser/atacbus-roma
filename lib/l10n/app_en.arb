@@ -194,5 +194,8 @@
       }
     }
   },
-  "walkingTransfer": "Walking Transfer"
+  "walkingTransfer": "Walking Transfer",
+  "sortFastest": "Fastest",
+  "sortFewestTransfers": "Fewest transfers",
+  "sortEarliestDeparture": "Earliest"
 }

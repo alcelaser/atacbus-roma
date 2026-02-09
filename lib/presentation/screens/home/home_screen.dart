@@ -27,6 +27,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _refresh() {
+    ref.invalidate(nearbyLocationProvider);
     ref.invalidate(nearbyStopsProvider);
     ref.invalidate(favoriteStopIdsProvider);
     setState(() {

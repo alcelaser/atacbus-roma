@@ -46,6 +46,7 @@ lib/
     constants/
       api_constants.dart             # GTFS URLs, refresh intervals
       app_constants.dart             # App name, batch size, Rome coords, prefs keys
+      rome_landmarks.dart            # Curated list of ~24 major Rome landmarks (lat/lon/name)
     error/
       exceptions.dart                # ServerException, CacheException, ParseException, SyncException
       failures.dart                  # Failure hierarchy (Server, Cache, Parse, Sync, Location)
@@ -98,7 +99,8 @@ lib/
       favorite_stop.dart             #   FavoriteStop (stopId, addedAt)
       favorite_route.dart            #   FavoriteRouteEntity (originLat/Lon, destStopId, addedAt)
       stop_time_detail.dart          #   StopTimeDetail (stopId, stopName, arrivalTime, departureTime, sequence)
-      trip_plan.dart                 #   TripLeg (transit or walking), TripItinerary, TripPlanResult
+      trip_plan.dart                 #   TripLeg (transit or walking), TripItinerary, TripPlanResult, TripSortMode, TripDestination
+      search_result.dart             #   SearchResult (unified: stop, station, landmark)
     repositories/                    # Abstract interfaces:
       gtfs_repository.dart           #   searchStops, getScheduledDepartures, favorites, routes
       realtime_repository.dart       #   getTripDelays, getVehiclePositions, getServiceAlerts
@@ -120,7 +122,7 @@ lib/
       stop_detail/stop_detail_screen.dart  # Departure list, RT auto-refresh (30s), offline banner, favorite toggle, pull-to-refresh
       route_browser/route_browser_screen.dart  # Tabbed route list (All/Bus/Tram/Metro), LineBadge, tap to route detail
       route_detail/route_detail_screen.dart  # Route info + ordered stop list with timeline indicator, direction toggle (outbound/inbound), tap to stop detail
-      navigate/navigate_screen.dart  # GPS/stop origin, destination search, trip planning, favorite routes, walking transfers
+      navigate/navigate_screen.dart  # GPS/stop/landmark origin, destination search, trip planning with sort modes, favorite routes, walking transfers
       trip_detail/trip_detail_screen.dart  # Leg timeline with intermediate stops, walking segments, transfer indicators
       map/map_screen.dart            # flutter_map + OSM tiles, stop markers, live vehicle positions, user GPS location, bottom sheet stop info
       alerts/alerts_screen.dart      # Service alert cards with route/stop chips, offline banner, pull-to-refresh
@@ -337,6 +339,7 @@ Testing strategy: unit tests use hand-rolled mock repositories implementing abst
 | v0.0.14 | `v0.0.14` | GPS trip planning, trip detail view, favorite routes, AMOLED theme |
 | v0.0.15 | `v0.0.15` | Expand trip planning nearby radius to 1km for origin and destination |
 | v0.0.16 | `v0.0.16` | Walking transfers: walk up to 700m between stops during transfers, walking leg UI in navigate + trip detail screens |
+| v0.0.17 | `v0.0.17` | Navigation overhaul: sort by fastest/fewest transfers/earliest departure, searchable Rome landmarks + GTFS stations, robustness (try/catch per pair, always search transfers, 20 result cap), home refresh also re-fetches GPS |
 
 ## Roadmap
 

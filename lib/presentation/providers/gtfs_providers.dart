@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/rome_landmarks.dart';
 import '../../core/utils/distance_utils.dart';
 import '../../data/datasources/remote/gtfs_realtime_api.dart';
 import '../../data/repositories/gtfs_repository_impl.dart';
@@ -12,6 +13,7 @@ import '../../domain/entities/route_entity.dart';
 import '../../domain/entities/vehicle.dart';
 import '../../domain/entities/service_alert.dart';
 import '../../domain/entities/trip_plan.dart';
+import '../../domain/entities/search_result.dart';
 import '../../domain/entities/favorite_route.dart';
 import '../../domain/entities/stop_time_detail.dart';
 import '../../domain/repositories/realtime_repository.dart';
@@ -227,11 +229,11 @@ class TripOrigin {
         selectedStop = stop;
 }
 
-/// Selected origin for trip planning (GPS or stop).
+/// Selected origin for trip planning (GPS, stop, or landmark).
 final tripOriginProvider = StateProvider<TripOrigin?>((ref) => null);
 
-/// Selected destination stop for trip planning.
-final tripDestinationProvider = StateProvider<Stop?>((ref) => null);
+/// Selected destination for trip planning (stop or landmark).
+final tripDestinationProvider = StateProvider<TripDestination?>((ref) => null);
 
 /// Search query for origin stop input.
 final originSearchQueryProvider = StateProvider<String>((ref) => '');
@@ -239,27 +241,97 @@ final originSearchQueryProvider = StateProvider<String>((ref) => '');
 /// Search query for destination stop input.
 final destinationSearchQueryProvider = StateProvider<String>((ref) => '');
 
-/// Search results for origin stop autocomplete.
-final originSearchResultsProvider = FutureProvider<List<Stop>>((ref) async {
+/// Unified search results for origin autocomplete (landmarks + stations + stops).
+final originSearchResultsProvider =
+    FutureProvider<List<SearchResult>>((ref) async {
   final query = ref.watch(originSearchQueryProvider);
   if (query.trim().isEmpty) return [];
   final searchStops = ref.watch(searchStopsProvider);
-  return searchStops(query);
+  final stops = await searchStops(query);
+  return _buildUnifiedResults(query, stops);
 });
 
-/// Search results for destination stop autocomplete.
+/// Unified search results for destination autocomplete (landmarks + stations + stops).
 final destinationSearchResultsProvider =
-    FutureProvider<List<Stop>>((ref) async {
+    FutureProvider<List<SearchResult>>((ref) async {
   final query = ref.watch(destinationSearchQueryProvider);
   if (query.trim().isEmpty) return [];
   final searchStops = ref.watch(searchStopsProvider);
-  return searchStops(query);
+  final stops = await searchStops(query);
+  return _buildUnifiedResults(query, stops);
 });
+
+/// Build unified search results: landmarks first, then stations, then stops.
+List<SearchResult> _buildUnifiedResults(String query, List<Stop> stops) {
+  final queryLower = query.trim().toLowerCase();
+  final results = <SearchResult>[];
+  final seenCoords = <String>{};
+
+  // 1. Search landmarks (match both EN and IT names)
+  for (final lm in romeLandmarks) {
+    if (lm.nameEn.toLowerCase().contains(queryLower) ||
+        lm.nameIt.toLowerCase().contains(queryLower)) {
+      final coordKey =
+          '${(lm.lat * 1000).round()},${(lm.lon * 1000).round()}';
+      if (!seenCoords.contains(coordKey)) {
+        seenCoords.add(coordKey);
+        results.add(SearchResult(
+          id: lm.id,
+          name: lm.nameIt, // Display Italian name (primary locale)
+          lat: lm.lat,
+          lon: lm.lon,
+          type: SearchResultType.landmark,
+        ));
+      }
+    }
+  }
+
+  // 2. Search GTFS stations (locationType == 1)
+  for (final stop in stops) {
+    if (stop.locationType == 1) {
+      final coordKey = '${(stop.stopLat * 1000).round()},${(stop.stopLon * 1000).round()}';
+      if (!seenCoords.contains(coordKey)) {
+        seenCoords.add(coordKey);
+        results.add(SearchResult(
+          id: stop.stopId,
+          name: stop.stopName,
+          lat: stop.stopLat,
+          lon: stop.stopLon,
+          type: SearchResultType.station,
+          stopId: stop.stopId,
+        ));
+      }
+    }
+  }
+
+  // 3. Regular stops
+  for (final stop in stops) {
+    if (stop.locationType == 1) continue; // already added above
+    final coordKey = '${(stop.stopLat * 1000).round()},${(stop.stopLon * 1000).round()}';
+    if (!seenCoords.contains(coordKey)) {
+      seenCoords.add(coordKey);
+      results.add(SearchResult(
+        id: stop.stopId,
+        name: stop.stopName,
+        lat: stop.stopLat,
+        lon: stop.stopLon,
+        type: SearchResultType.stop,
+        stopId: stop.stopId,
+      ));
+    }
+  }
+
+  return results.take(30).toList();
+}
 
 /// PlanTrip use case provider.
 final planTripProvider = Provider<PlanTrip>((ref) {
   return PlanTrip(ref.watch(gtfsRepositoryProvider));
 });
+
+/// Trip sort mode.
+final tripSortModeProvider =
+    StateProvider<TripSortMode>((ref) => TripSortMode.fastest);
 
 /// Trip plan result: resolves nearby stops for origin/dest then plans.
 final tripPlanResultProvider =
@@ -281,18 +353,29 @@ final tripPlanResultProvider =
       originStopIds.insert(0, origin.selectedStop!.stopId);
     }
   } else {
-    // GPS-based: all stops within walking distance
+    // GPS-based or landmark: all stops within walking distance
     originStopIds = _findNearbyStopIds(allStops, origin.lat, origin.lon);
   }
 
-  // Resolve destination stop IDs (search + nearby)
-  final destStopIds = _findNearbyStopIds(
-    allStops,
-    destination.stopLat,
-    destination.stopLon,
-  );
-  if (!destStopIds.contains(destination.stopId)) {
-    destStopIds.insert(0, destination.stopId);
+  // Resolve destination stop IDs
+  List<String> destStopIds;
+  if (destination.stopId != null) {
+    // Stop-based destination
+    destStopIds = _findNearbyStopIds(
+      allStops,
+      destination.lat,
+      destination.lon,
+    );
+    if (!destStopIds.contains(destination.stopId)) {
+      destStopIds.insert(0, destination.stopId!);
+    }
+  } else {
+    // Landmark destination: resolve nearby stops as candidates
+    destStopIds = _findNearbyStopIds(
+      allStops,
+      destination.lat,
+      destination.lon,
+    );
   }
 
   if (originStopIds.isEmpty || destStopIds.isEmpty) return null;
@@ -301,9 +384,44 @@ final tripPlanResultProvider =
     originStopIds: originStopIds,
     destStopIds: destStopIds,
     originName: origin.name,
-    destinationName: destination.stopName,
+    destinationName: destination.name,
     allStops: allStops,
   );
+});
+
+/// Sorted trip plan result — applies the selected sort mode.
+final sortedTripPlanResultProvider = Provider<AsyncValue<TripPlanResult?>>((ref) {
+  final resultAsync = ref.watch(tripPlanResultProvider);
+  final sortMode = ref.watch(tripSortModeProvider);
+
+  return resultAsync.whenData((result) {
+    if (result == null || result.itineraries.isEmpty) return result;
+
+    final sorted = List<TripItinerary>.from(result.itineraries);
+    switch (sortMode) {
+      case TripSortMode.fastest:
+        sorted.sort(
+            (a, b) => a.totalDurationSeconds.compareTo(b.totalDurationSeconds));
+        break;
+      case TripSortMode.fewestTransfers:
+        sorted.sort((a, b) {
+          final cmp = a.transferCount.compareTo(b.transferCount);
+          if (cmp != 0) return cmp;
+          return a.totalDurationSeconds.compareTo(b.totalDurationSeconds);
+        });
+        break;
+      case TripSortMode.earliestDeparture:
+        sorted.sort(
+            (a, b) => a.departureSeconds.compareTo(b.departureSeconds));
+        break;
+    }
+
+    return TripPlanResult(
+      originName: result.originName,
+      destinationName: result.destinationName,
+      itineraries: sorted,
+    );
+  });
 });
 
 /// Helper: find stop IDs within walking distance of a point.

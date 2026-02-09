@@ -1,3 +1,9 @@
+import 'search_result.dart';
+import 'stop.dart';
+
+/// Sort modes for trip plan results.
+enum TripSortMode { fastest, fewestTransfers, earliestDeparture }
+
 /// A single ride on one transit line from boarding stop to alighting stop,
 /// or a walking segment between two stops.
 class TripLeg {
@@ -53,6 +59,12 @@ class TripItinerary {
   /// Transit legs only (excludes walking segments).
   List<TripLeg> get transitLegs => legs.where((l) => !l.isWalking).toList();
 
+  /// Number of transfers (0 for direct, 1 for one-transfer, etc.).
+  int get transferCount {
+    final transit = transitLegs;
+    return transit.length <= 1 ? 0 : transit.length - 1;
+  }
+
   String? get transferStopName {
     if (!hasTransfer) return null;
     if (hasWalkingTransfer) {
@@ -78,4 +90,31 @@ class TripPlanResult {
     required this.destinationName,
     required this.itineraries,
   });
+}
+
+/// Destination for trip planning — can be a stop or a landmark/location.
+class TripDestination {
+  final double lat;
+  final double lon;
+  final String name;
+  final String? stopId;
+
+  const TripDestination({
+    required this.lat,
+    required this.lon,
+    required this.name,
+    this.stopId,
+  });
+
+  TripDestination.fromStop(Stop stop)
+      : lat = stop.stopLat,
+        lon = stop.stopLon,
+        name = stop.stopName,
+        stopId = stop.stopId;
+
+  TripDestination.fromSearchResult(SearchResult result)
+      : lat = result.lat,
+        lon = result.lon,
+        name = result.name,
+        stopId = result.stopId;
 }

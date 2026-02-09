@@ -5,7 +5,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/utils/date_time_utils.dart';
-import '../../../domain/entities/stop.dart';
+import '../../../domain/entities/search_result.dart';
 import '../../../domain/entities/trip_plan.dart';
 import '../../providers/gtfs_providers.dart';
 import '../../widgets/line_badge.dart';
@@ -54,16 +54,38 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
     });
   }
 
-  void _selectOrigin(Stop stop) {
-    ref.read(tripOriginProvider.notifier).state = TripOrigin.stop(stop);
-    _originController.text = stop.stopName;
+  void _selectOriginResult(SearchResult result) {
+    if (result.stopId != null) {
+      // Stop or station — resolve via repo to get full Stop object
+      _resolveAndSelectOriginStop(result.stopId!, result.name);
+    } else {
+      // Landmark — use GPS-style origin
+      ref.read(tripOriginProvider.notifier).state = TripOrigin.gps(
+        lat: result.lat,
+        lon: result.lon,
+        name: result.name,
+      );
+      _originController.text = result.name;
+    }
     setState(() => _showOriginResults = false);
     ref.read(originSearchQueryProvider.notifier).state = '';
   }
 
-  void _selectDestination(Stop stop) {
-    ref.read(tripDestinationProvider.notifier).state = stop;
-    _destinationController.text = stop.stopName;
+  void _resolveAndSelectOriginStop(String stopId, String fallbackName) async {
+    final repo = ref.read(gtfsRepositoryProvider);
+    final stop = await repo.getStopById(stopId);
+    if (stop != null && mounted) {
+      ref.read(tripOriginProvider.notifier).state = TripOrigin.stop(stop);
+      _originController.text = stop.stopName;
+    } else if (mounted) {
+      _originController.text = fallbackName;
+    }
+  }
+
+  void _selectDestinationResult(SearchResult result) {
+    ref.read(tripDestinationProvider.notifier).state =
+        TripDestination.fromSearchResult(result);
+    _destinationController.text = result.name;
     setState(() => _showDestinationResults = false);
     ref.read(destinationSearchQueryProvider.notifier).state = '';
   }
@@ -72,17 +94,44 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
     final origin = ref.read(tripOriginProvider);
     final destination = ref.read(tripDestinationProvider);
 
-    if (origin != null && origin.selectedStop != null && destination != null) {
-      ref.read(tripOriginProvider.notifier).state =
-          TripOrigin.stop(destination);
-      ref.read(tripDestinationProvider.notifier).state = origin.selectedStop;
-      _originController.text = destination.stopName;
-      _destinationController.text = origin.name;
+    if (origin != null && destination != null) {
+      // New origin from old destination
+      if (destination.stopId != null) {
+        _resolveAndSelectOriginStop(destination.stopId!, destination.name);
+      } else {
+        ref.read(tripOriginProvider.notifier).state = TripOrigin.gps(
+          lat: destination.lat,
+          lon: destination.lon,
+          name: destination.name,
+        );
+        _originController.text = destination.name;
+      }
+
+      // New destination from old origin
+      if (origin.selectedStop != null) {
+        ref.read(tripDestinationProvider.notifier).state =
+            TripDestination.fromStop(origin.selectedStop!);
+        _destinationController.text = origin.name;
+      } else {
+        ref.read(tripDestinationProvider.notifier).state = TripDestination(
+          lat: origin.lat,
+          lon: origin.lon,
+          name: origin.name,
+        );
+        _destinationController.text = origin.name;
+      }
     } else if (destination != null) {
-      ref.read(tripOriginProvider.notifier).state =
-          TripOrigin.stop(destination);
+      if (destination.stopId != null) {
+        _resolveAndSelectOriginStop(destination.stopId!, destination.name);
+      } else {
+        ref.read(tripOriginProvider.notifier).state = TripOrigin.gps(
+          lat: destination.lat,
+          lon: destination.lon,
+          name: destination.name,
+        );
+        _originController.text = destination.name;
+      }
       ref.read(tripDestinationProvider.notifier).state = null;
-      _originController.text = destination.stopName;
       _destinationController.text = '';
     }
   }
@@ -125,8 +174,8 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
       originLat: origin.lat,
       originLon: origin.lon,
       originName: origin.name,
-      destStopId: destination.stopId,
-      destStopName: destination.stopName,
+      destStopId: destination.stopId ?? 'landmark_${destination.name}',
+      destStopName: destination.name,
     );
 
     final l10n = AppLocalizations.of(context)!;
@@ -247,7 +296,10 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
     final repo = ref.read(gtfsRepositoryProvider);
     final stop = await repo.getStopById(destStopId);
     if (stop != null && mounted) {
-      _selectDestination(stop);
+      ref.read(tripDestinationProvider.notifier).state =
+          TripDestination.fromStop(stop);
+      _destinationController.text = stop.stopName;
+      setState(() => _showDestinationResults = false);
     } else if (mounted) {
       _destinationController.text = destStopName;
     }
@@ -281,6 +333,7 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
       body: Column(
         children: [
           _buildInputCard(theme, l10n),
+          _buildSortChips(theme, l10n),
           Expanded(
             child: _buildResults(theme, l10n),
           ),
@@ -380,24 +433,50 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
     );
   }
 
+  IconData _iconForType(SearchResultType type) {
+    switch (type) {
+      case SearchResultType.landmark:
+        return Icons.place;
+      case SearchResultType.station:
+        return Icons.train;
+      case SearchResultType.stop:
+        return Icons.location_on;
+    }
+  }
+
+  Color _iconColorForType(SearchResultType type, ThemeData theme) {
+    switch (type) {
+      case SearchResultType.landmark:
+        return theme.colorScheme.primary;
+      case SearchResultType.station:
+        return theme.colorScheme.tertiary;
+      case SearchResultType.stop:
+        return theme.colorScheme.onSurface.withOpacity(0.6);
+    }
+  }
+
   Widget _buildOriginAutocomplete(ThemeData theme) {
     final resultsAsync = ref.watch(originSearchResultsProvider);
     return resultsAsync.when(
-      data: (stops) {
-        if (stops.isEmpty) return const SizedBox.shrink();
+      data: (results) {
+        if (results.isEmpty) return const SizedBox.shrink();
         return ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 200),
           child: ListView.builder(
             shrinkWrap: true,
-            itemCount: stops.length,
+            itemCount: results.length,
             itemBuilder: (context, index) {
-              final stop = stops[index];
+              final result = results[index];
               return ListTile(
                 dense: true,
-                leading: const Icon(Icons.location_on, size: 18),
-                title: Text(stop.stopName,
+                leading: Icon(
+                  _iconForType(result.type),
+                  size: 18,
+                  color: _iconColorForType(result.type, theme),
+                ),
+                title: Text(result.name,
                     maxLines: 1, overflow: TextOverflow.ellipsis),
-                onTap: () => _selectOrigin(stop),
+                onTap: () => _selectOriginResult(result),
               );
             },
           ),
@@ -418,21 +497,25 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
   Widget _buildDestinationAutocomplete(ThemeData theme) {
     final resultsAsync = ref.watch(destinationSearchResultsProvider);
     return resultsAsync.when(
-      data: (stops) {
-        if (stops.isEmpty) return const SizedBox.shrink();
+      data: (results) {
+        if (results.isEmpty) return const SizedBox.shrink();
         return ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 200),
           child: ListView.builder(
             shrinkWrap: true,
-            itemCount: stops.length,
+            itemCount: results.length,
             itemBuilder: (context, index) {
-              final stop = stops[index];
+              final result = results[index];
               return ListTile(
                 dense: true,
-                leading: const Icon(Icons.location_on, size: 18),
-                title: Text(stop.stopName,
+                leading: Icon(
+                  _iconForType(result.type),
+                  size: 18,
+                  color: _iconColorForType(result.type, theme),
+                ),
+                title: Text(result.name,
                     maxLines: 1, overflow: TextOverflow.ellipsis),
-                onTap: () => _selectDestination(stop),
+                onTap: () => _selectDestinationResult(result),
               );
             },
           ),
@@ -450,8 +533,61 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
     );
   }
 
+  Widget _buildSortChips(ThemeData theme, AppLocalizations l10n) {
+    final sortMode = ref.watch(tripSortModeProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          _sortChip(
+            label: l10n.sortFastest,
+            selected: sortMode == TripSortMode.fastest,
+            onTap: () => ref.read(tripSortModeProvider.notifier).state =
+                TripSortMode.fastest,
+            theme: theme,
+          ),
+          const SizedBox(width: 6),
+          _sortChip(
+            label: l10n.sortFewestTransfers,
+            selected: sortMode == TripSortMode.fewestTransfers,
+            onTap: () => ref.read(tripSortModeProvider.notifier).state =
+                TripSortMode.fewestTransfers,
+            theme: theme,
+          ),
+          const SizedBox(width: 6),
+          _sortChip(
+            label: l10n.sortEarliestDeparture,
+            selected: sortMode == TripSortMode.earliestDeparture,
+            onTap: () => ref.read(tripSortModeProvider.notifier).state =
+                TripSortMode.earliestDeparture,
+            theme: theme,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sortChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    required ThemeData theme,
+  }) {
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 11),
+      ),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+
   Widget _buildResults(ThemeData theme, AppLocalizations l10n) {
-    final resultAsync = ref.watch(tripPlanResultProvider);
+    final resultAsync = ref.watch(sortedTripPlanResultProvider);
 
     return resultAsync.when(
       data: (result) {

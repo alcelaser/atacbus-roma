@@ -57,55 +57,58 @@ class PlanTrip {
       for (final dId in dests) {
         if (oId == dId) continue;
 
-        // ─── Direct routes ───────────────────────────────────
-        final directRows = await _repo.findDirectTrips(oId, dId);
-        final seenRoutes = <String, int>{};
+        try {
+          // ─── Direct routes ───────────────────────────────────
+          final directRows = await _repo.findDirectTrips(oId, dId);
+          final seenRoutes = <String, int>{};
 
-        final oName = await _resolveStopName(oId, stopNameCache);
-        final dName = await _resolveStopName(dId, stopNameCache);
+          final oName = await _resolveStopName(oId, stopNameCache);
+          final dName = await _resolveStopName(dId, stopNameCache);
 
-        for (final row in directRows) {
-          final depSeconds = DateTimeUtils.parseGtfsTime(row.departureTime);
-          if (depSeconds < now || depSeconds > maxTime) continue;
+          for (final row in directRows) {
+            final depSeconds = DateTimeUtils.parseGtfsTime(row.departureTime);
+            if (depSeconds < now || depSeconds > maxTime) continue;
 
-          final routeCount = seenRoutes[row.routeId] ?? 0;
-          if (routeCount >= 2) continue;
-          seenRoutes[row.routeId] = routeCount + 1;
+            final routeCount = seenRoutes[row.routeId] ?? 0;
+            if (routeCount >= 2) continue;
+            seenRoutes[row.routeId] = routeCount + 1;
 
-          final key = '${row.routeId}:$depSeconds';
-          if (seenKeys.contains(key)) continue;
-          seenKeys.add(key);
+            final key = '${row.routeId}:$depSeconds';
+            if (seenKeys.contains(key)) continue;
+            seenKeys.add(key);
 
-          final arrSeconds = DateTimeUtils.parseGtfsTime(row.arrivalTime);
+            final arrSeconds = DateTimeUtils.parseGtfsTime(row.arrivalTime);
 
-          allItineraries.add(TripItinerary(
-            legs: [
-              TripLeg(
-                tripId: row.tripId,
-                routeId: row.routeId,
-                routeShortName: row.routeShortName,
-                routeColor: row.routeColor,
-                tripHeadsign: row.tripHeadsign,
-                boardStopId: oId,
-                boardStopName: oName,
-                alightStopId: dId,
-                alightStopName: dName,
-                departureSeconds: depSeconds,
-                arrivalSeconds: arrSeconds,
-                boardSequence: row.depSequence,
-                alightSequence: row.arrSequence,
-              ),
-            ],
-          ));
-        }
+            allItineraries.add(TripItinerary(
+              legs: [
+                TripLeg(
+                  tripId: row.tripId,
+                  routeId: row.routeId,
+                  routeShortName: row.routeShortName,
+                  routeColor: row.routeColor,
+                  tripHeadsign: row.tripHeadsign,
+                  boardStopId: oId,
+                  boardStopName: oName,
+                  alightStopId: dId,
+                  alightStopName: dName,
+                  departureSeconds: depSeconds,
+                  arrivalSeconds: arrSeconds,
+                  boardSequence: row.depSequence,
+                  alightSequence: row.arrSequence,
+                ),
+              ],
+            ));
+          }
 
-        // ─── 1-transfer routes (if few direct results) ──────
-        if (seenRoutes.length < 3) {
+          // ─── 1-transfer routes ──────────────────────────────
           final transfers = await _findTransferItineraries(
             oId, dId, oName, dName, now, maxTime, seenKeys, stopNameCache,
             allStops,
           );
           allItineraries.addAll(transfers);
+        } catch (_) {
+          // Skip this origin-dest pair on error and continue
+          continue;
         }
       }
     }
@@ -116,7 +119,7 @@ class PlanTrip {
     return TripPlanResult(
       originName: originName,
       destinationName: destinationName,
-      itineraries: allItineraries.take(10).toList(),
+      itineraries: allItineraries.take(AppConstants.maxTripResults).toList(),
     );
   }
 

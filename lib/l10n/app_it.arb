@@ -131,5 +131,8 @@
       }
     }
   },
-  "walkingTransfer": "Trasbordo a piedi"
+  "walkingTransfer": "Trasbordo a piedi",
+  "sortFastest": "Più veloce",
+  "sortFewestTransfers": "Meno cambi",
+  "sortEarliestDeparture": "Prima partenza"
 }
