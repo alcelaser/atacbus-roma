@@ -18,11 +18,20 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _searchController = TextEditingController();
   bool _isSearching = false;
+  DateTime? _lastRefreshed;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _refresh() {
+    ref.invalidate(nearbyStopsProvider);
+    ref.invalidate(favoriteStopIdsProvider);
+    setState(() {
+      _lastRefreshed = DateTime.now();
+    });
   }
 
   @override
@@ -118,30 +127,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Search card
-        Card(
-          child: InkWell(
-            onTap: () => setState(() => _isSearching = true),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(Icons.search,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5)),
-                  const SizedBox(width: 12),
-                  Text(
-                    l10n.searchStops,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                  ),
-                ],
-              ),
+        // Refresh row
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refresh,
+              tooltip: 'Refresh',
             ),
-          ),
+            if (_lastRefreshed != null)
+              Text(
+                'last refreshed at: ${_lastRefreshed!.hour.toString().padLeft(2, '0')}:${_lastRefreshed!.minute.toString().padLeft(2, '0')}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.green,
+                ),
+              ),
+          ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
 
         // Favorites section
         Text(
