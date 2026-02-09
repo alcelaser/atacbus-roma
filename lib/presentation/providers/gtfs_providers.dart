@@ -12,6 +12,8 @@ import '../../domain/entities/route_entity.dart';
 import '../../domain/entities/vehicle.dart';
 import '../../domain/entities/service_alert.dart';
 import '../../domain/entities/trip_plan.dart';
+import '../../domain/entities/favorite_route.dart';
+import '../../domain/entities/stop_time_detail.dart';
 import '../../domain/repositories/realtime_repository.dart';
 import '../../domain/usecases/search_stops.dart';
 import '../../domain/usecases/get_stop_departures.dart';
@@ -205,8 +207,28 @@ final directionHeadsignProvider =
 
 // ─── Trip planning ───────────────────────────────────────────────
 
-/// Selected origin stop for trip planning.
-final tripOriginProvider = StateProvider<Stop?>((ref) => null);
+/// Represents a trip origin — either GPS-based or a selected stop.
+class TripOrigin {
+  final double lat;
+  final double lon;
+  final String name;
+  final Stop? selectedStop; // null when GPS-based
+
+  TripOrigin.gps({
+    required this.lat,
+    required this.lon,
+    required this.name,
+  }) : selectedStop = null;
+
+  TripOrigin.stop(Stop stop)
+      : lat = stop.stopLat,
+        lon = stop.stopLon,
+        name = stop.stopName,
+        selectedStop = stop;
+}
+
+/// Selected origin for trip planning (GPS or stop).
+final tripOriginProvider = StateProvider<TripOrigin?>((ref) => null);
 
 /// Selected destination stop for trip planning.
 final tripDestinationProvider = StateProvider<Stop?>((ref) => null);
@@ -239,12 +261,81 @@ final planTripProvider = Provider<PlanTrip>((ref) {
   return PlanTrip(ref.watch(gtfsRepositoryProvider));
 });
 
-/// Trip plan result: watches origin + destination, runs trip planning.
+/// Trip plan result: resolves nearby stops for origin/dest then plans.
 final tripPlanResultProvider =
     FutureProvider<TripPlanResult?>((ref) async {
   final origin = ref.watch(tripOriginProvider);
   final destination = ref.watch(tripDestinationProvider);
   if (origin == null || destination == null) return null;
+
+  final repo = ref.watch(gtfsRepositoryProvider);
+  final allStops = await repo.getAllStops();
   final planTrip = ref.watch(planTripProvider);
-  return planTrip(origin.stopId, destination.stopId);
+
+  // Resolve origin stop IDs
+  List<String> originStopIds;
+  if (origin.selectedStop != null) {
+    // Stop-based: use selected stop + nearby stops within walking distance
+    originStopIds = _findNearbyStopIds(allStops, origin.lat, origin.lon);
+    if (!originStopIds.contains(origin.selectedStop!.stopId)) {
+      originStopIds.insert(0, origin.selectedStop!.stopId);
+    }
+  } else {
+    // GPS-based: all stops within walking distance
+    originStopIds = _findNearbyStopIds(allStops, origin.lat, origin.lon);
+  }
+
+  // Resolve destination stop IDs (search + nearby)
+  final destStopIds = _findNearbyStopIds(
+    allStops,
+    destination.stopLat,
+    destination.stopLon,
+  );
+  if (!destStopIds.contains(destination.stopId)) {
+    destStopIds.insert(0, destination.stopId);
+  }
+
+  if (originStopIds.isEmpty || destStopIds.isEmpty) return null;
+
+  return planTrip.callMulti(
+    originStopIds: originStopIds,
+    destStopIds: destStopIds,
+    originName: origin.name,
+    destinationName: destination.stopName,
+  );
+});
+
+/// Helper: find stop IDs within walking distance of a point.
+List<String> _findNearbyStopIds(
+    List<Stop> allStops, double lat, double lon) {
+  final nearby = <({String stopId, double distance})>[];
+  for (final stop in allStops) {
+    final distance = DistanceUtils.haversineDistance(
+      lat, lon, stop.stopLat, stop.stopLon,
+    );
+    if (distance <= AppConstants.tripPlanNearbyRadiusMeters) {
+      nearby.add((stopId: stop.stopId, distance: distance));
+    }
+  }
+  nearby.sort((a, b) => a.distance.compareTo(b.distance));
+  return nearby.take(10).map((n) => n.stopId).toList();
+}
+
+// ─── Favorite routes ─────────────────────────────────────────────
+
+/// Stream of saved favorite routes.
+final favoriteRoutesProvider =
+    StreamProvider<List<FavoriteRouteEntity>>((ref) {
+  final repo = ref.watch(gtfsRepositoryProvider);
+  return repo.watchFavoriteRoutes();
+});
+
+// ─── Trip stop times (for trip detail) ────────────────────────────
+
+/// Stop times for a trip (family by tripId).
+final tripStopTimesProvider =
+    FutureProvider.family<List<StopTimeDetail>, String>(
+        (ref, tripId) async {
+  final repo = ref.watch(gtfsRepositoryProvider);
+  return repo.getStopTimesForTripWithNames(tripId);
 });

@@ -52,17 +52,13 @@ class TripItinerary {
 
 /// Result of a trip plan query.
 class TripPlanResult {
-  final String originStopId;
-  final String originStopName;
-  final String destinationStopId;
-  final String destinationStopName;
+  final String originName;
+  final String destinationName;
   final List<TripItinerary> itineraries;
 
   const TripPlanResult({
-    required this.originStopId,
-    required this.originStopName,
-    required this.destinationStopId,
-    required this.destinationStopName,
+    required this.originName,
+    required this.destinationName,
     required this.itineraries,
   });
 }

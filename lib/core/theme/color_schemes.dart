@@ -32,25 +32,29 @@ class AppColorSchemes {
     );
   }
 
-  /// Dark colour scheme for night mode.
+  /// Dark colour scheme – AMOLED true-black for OLED screens.
   static ColorScheme darkColorScheme() {
     return const ColorScheme(
       brightness: Brightness.dark,
-      primary: Color(0xFFFFB4AA),
-      onPrimary: Color(0xFF690003),
+      primary: Color(0xFFFF6B5A),
+      onPrimary: Color(0xFF3B0000),
       primaryContainer: Color(0xFF8B0000),
       onPrimaryContainer: Color(0xFFFFDAD5),
       secondary: Color(0xFFFFD700),
       onSecondary: Color(0xFF3D2E00),
       secondaryContainer: Color(0xFF574400),
       onSecondaryContainer: Color(0xFFFFF0C0),
-      surface: Color(0xFF201A19),
-      onSurface: Color(0xFFEDE0DD),
-      surfaceVariant: Color(0xFF534341),
+      tertiary: Color(0xFFFFB74D),
+      onTertiary: Color(0xFF4A2800),
+      tertiaryContainer: Color(0xFF6B3A00),
+      onTertiaryContainer: Color(0xFFFFDCBE),
+      surface: Color(0xFF000000),
+      onSurface: Color(0xFFFFFFFF),
+      surfaceVariant: Color(0xFF1A1A1A),
       error: Color(0xFFFFB4AB),
       onError: Color(0xFF690005),
-      background: Color(0xFF201A19),
-      onBackground: Color(0xFFEDE0DD),
+      background: Color(0xFF000000),
+      onBackground: Color(0xFFFFFFFF),
     );
   }
 }

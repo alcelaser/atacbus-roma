@@ -16,7 +16,7 @@ void main() {
 
     test('dark color scheme has correct primary color', () {
       final scheme = AppColorSchemes.darkColorScheme();
-      expect(scheme.primary, const Color(0xFFFFB4AA));
+      expect(scheme.primary, const Color(0xFFFF6B5A));
       expect(scheme.brightness, Brightness.dark);
     });
 
@@ -49,7 +49,7 @@ void main() {
 
     test('dark theme has correct color scheme', () {
       final theme = AppTheme.darkTheme();
-      expect(theme.colorScheme.primary, const Color(0xFFFFB4AA));
+      expect(theme.colorScheme.primary, const Color(0xFFFF6B5A));
     });
   });
 

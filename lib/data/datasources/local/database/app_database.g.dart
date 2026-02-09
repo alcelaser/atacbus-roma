@@ -2880,6 +2880,374 @@ class FavoriteStopsCompanion extends UpdateCompanion<FavoriteStop> {
   }
 }
 
+class $FavoriteRoutesTable extends FavoriteRoutes
+    with TableInfo<$FavoriteRoutesTable, FavoriteRoute> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FavoriteRoutesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _originLatMeta =
+      const VerificationMeta('originLat');
+  @override
+  late final GeneratedColumn<double> originLat = GeneratedColumn<double>(
+      'origin_lat', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _originLonMeta =
+      const VerificationMeta('originLon');
+  @override
+  late final GeneratedColumn<double> originLon = GeneratedColumn<double>(
+      'origin_lon', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _originNameMeta =
+      const VerificationMeta('originName');
+  @override
+  late final GeneratedColumn<String> originName = GeneratedColumn<String>(
+      'origin_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _destStopIdMeta =
+      const VerificationMeta('destStopId');
+  @override
+  late final GeneratedColumn<String> destStopId = GeneratedColumn<String>(
+      'dest_stop_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _destStopNameMeta =
+      const VerificationMeta('destStopName');
+  @override
+  late final GeneratedColumn<String> destStopName = GeneratedColumn<String>(
+      'dest_stop_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _addedAtMeta =
+      const VerificationMeta('addedAt');
+  @override
+  late final GeneratedColumn<DateTime> addedAt = GeneratedColumn<DateTime>(
+      'added_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, originLat, originLon, originName, destStopId, destStopName, addedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'favorite_routes';
+  @override
+  VerificationContext validateIntegrity(Insertable<FavoriteRoute> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('origin_lat')) {
+      context.handle(_originLatMeta,
+          originLat.isAcceptableOrUnknown(data['origin_lat']!, _originLatMeta));
+    } else if (isInserting) {
+      context.missing(_originLatMeta);
+    }
+    if (data.containsKey('origin_lon')) {
+      context.handle(_originLonMeta,
+          originLon.isAcceptableOrUnknown(data['origin_lon']!, _originLonMeta));
+    } else if (isInserting) {
+      context.missing(_originLonMeta);
+    }
+    if (data.containsKey('origin_name')) {
+      context.handle(
+          _originNameMeta,
+          originName.isAcceptableOrUnknown(
+              data['origin_name']!, _originNameMeta));
+    } else if (isInserting) {
+      context.missing(_originNameMeta);
+    }
+    if (data.containsKey('dest_stop_id')) {
+      context.handle(
+          _destStopIdMeta,
+          destStopId.isAcceptableOrUnknown(
+              data['dest_stop_id']!, _destStopIdMeta));
+    } else if (isInserting) {
+      context.missing(_destStopIdMeta);
+    }
+    if (data.containsKey('dest_stop_name')) {
+      context.handle(
+          _destStopNameMeta,
+          destStopName.isAcceptableOrUnknown(
+              data['dest_stop_name']!, _destStopNameMeta));
+    } else if (isInserting) {
+      context.missing(_destStopNameMeta);
+    }
+    if (data.containsKey('added_at')) {
+      context.handle(_addedAtMeta,
+          addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta));
+    } else if (isInserting) {
+      context.missing(_addedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FavoriteRoute map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FavoriteRoute(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      originLat: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}origin_lat'])!,
+      originLon: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}origin_lon'])!,
+      originName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}origin_name'])!,
+      destStopId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}dest_stop_id'])!,
+      destStopName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}dest_stop_name'])!,
+      addedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}added_at'])!,
+    );
+  }
+
+  @override
+  $FavoriteRoutesTable createAlias(String alias) {
+    return $FavoriteRoutesTable(attachedDatabase, alias);
+  }
+}
+
+class FavoriteRoute extends DataClass implements Insertable<FavoriteRoute> {
+  final int id;
+  final double originLat;
+  final double originLon;
+  final String originName;
+  final String destStopId;
+  final String destStopName;
+  final DateTime addedAt;
+  const FavoriteRoute(
+      {required this.id,
+      required this.originLat,
+      required this.originLon,
+      required this.originName,
+      required this.destStopId,
+      required this.destStopName,
+      required this.addedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['origin_lat'] = Variable<double>(originLat);
+    map['origin_lon'] = Variable<double>(originLon);
+    map['origin_name'] = Variable<String>(originName);
+    map['dest_stop_id'] = Variable<String>(destStopId);
+    map['dest_stop_name'] = Variable<String>(destStopName);
+    map['added_at'] = Variable<DateTime>(addedAt);
+    return map;
+  }
+
+  FavoriteRoutesCompanion toCompanion(bool nullToAbsent) {
+    return FavoriteRoutesCompanion(
+      id: Value(id),
+      originLat: Value(originLat),
+      originLon: Value(originLon),
+      originName: Value(originName),
+      destStopId: Value(destStopId),
+      destStopName: Value(destStopName),
+      addedAt: Value(addedAt),
+    );
+  }
+
+  factory FavoriteRoute.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FavoriteRoute(
+      id: serializer.fromJson<int>(json['id']),
+      originLat: serializer.fromJson<double>(json['originLat']),
+      originLon: serializer.fromJson<double>(json['originLon']),
+      originName: serializer.fromJson<String>(json['originName']),
+      destStopId: serializer.fromJson<String>(json['destStopId']),
+      destStopName: serializer.fromJson<String>(json['destStopName']),
+      addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'originLat': serializer.toJson<double>(originLat),
+      'originLon': serializer.toJson<double>(originLon),
+      'originName': serializer.toJson<String>(originName),
+      'destStopId': serializer.toJson<String>(destStopId),
+      'destStopName': serializer.toJson<String>(destStopName),
+      'addedAt': serializer.toJson<DateTime>(addedAt),
+    };
+  }
+
+  FavoriteRoute copyWith(
+          {int? id,
+          double? originLat,
+          double? originLon,
+          String? originName,
+          String? destStopId,
+          String? destStopName,
+          DateTime? addedAt}) =>
+      FavoriteRoute(
+        id: id ?? this.id,
+        originLat: originLat ?? this.originLat,
+        originLon: originLon ?? this.originLon,
+        originName: originName ?? this.originName,
+        destStopId: destStopId ?? this.destStopId,
+        destStopName: destStopName ?? this.destStopName,
+        addedAt: addedAt ?? this.addedAt,
+      );
+  @override
+  String toString() {
+    return (StringBuffer('FavoriteRoute(')
+          ..write('id: $id, ')
+          ..write('originLat: $originLat, ')
+          ..write('originLon: $originLon, ')
+          ..write('originName: $originName, ')
+          ..write('destStopId: $destStopId, ')
+          ..write('destStopName: $destStopName, ')
+          ..write('addedAt: $addedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id, originLat, originLon, originName, destStopId, destStopName, addedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FavoriteRoute &&
+          other.id == this.id &&
+          other.originLat == this.originLat &&
+          other.originLon == this.originLon &&
+          other.originName == this.originName &&
+          other.destStopId == this.destStopId &&
+          other.destStopName == this.destStopName &&
+          other.addedAt == this.addedAt);
+}
+
+class FavoriteRoutesCompanion extends UpdateCompanion<FavoriteRoute> {
+  final Value<int> id;
+  final Value<double> originLat;
+  final Value<double> originLon;
+  final Value<String> originName;
+  final Value<String> destStopId;
+  final Value<String> destStopName;
+  final Value<DateTime> addedAt;
+  const FavoriteRoutesCompanion({
+    this.id = const Value.absent(),
+    this.originLat = const Value.absent(),
+    this.originLon = const Value.absent(),
+    this.originName = const Value.absent(),
+    this.destStopId = const Value.absent(),
+    this.destStopName = const Value.absent(),
+    this.addedAt = const Value.absent(),
+  });
+  FavoriteRoutesCompanion.insert({
+    this.id = const Value.absent(),
+    required double originLat,
+    required double originLon,
+    required String originName,
+    required String destStopId,
+    required String destStopName,
+    required DateTime addedAt,
+  })  : originLat = Value(originLat),
+        originLon = Value(originLon),
+        originName = Value(originName),
+        destStopId = Value(destStopId),
+        destStopName = Value(destStopName),
+        addedAt = Value(addedAt);
+  static Insertable<FavoriteRoute> custom({
+    Expression<int>? id,
+    Expression<double>? originLat,
+    Expression<double>? originLon,
+    Expression<String>? originName,
+    Expression<String>? destStopId,
+    Expression<String>? destStopName,
+    Expression<DateTime>? addedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (originLat != null) 'origin_lat': originLat,
+      if (originLon != null) 'origin_lon': originLon,
+      if (originName != null) 'origin_name': originName,
+      if (destStopId != null) 'dest_stop_id': destStopId,
+      if (destStopName != null) 'dest_stop_name': destStopName,
+      if (addedAt != null) 'added_at': addedAt,
+    });
+  }
+
+  FavoriteRoutesCompanion copyWith(
+      {Value<int>? id,
+      Value<double>? originLat,
+      Value<double>? originLon,
+      Value<String>? originName,
+      Value<String>? destStopId,
+      Value<String>? destStopName,
+      Value<DateTime>? addedAt}) {
+    return FavoriteRoutesCompanion(
+      id: id ?? this.id,
+      originLat: originLat ?? this.originLat,
+      originLon: originLon ?? this.originLon,
+      originName: originName ?? this.originName,
+      destStopId: destStopId ?? this.destStopId,
+      destStopName: destStopName ?? this.destStopName,
+      addedAt: addedAt ?? this.addedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (originLat.present) {
+      map['origin_lat'] = Variable<double>(originLat.value);
+    }
+    if (originLon.present) {
+      map['origin_lon'] = Variable<double>(originLon.value);
+    }
+    if (originName.present) {
+      map['origin_name'] = Variable<String>(originName.value);
+    }
+    if (destStopId.present) {
+      map['dest_stop_id'] = Variable<String>(destStopId.value);
+    }
+    if (destStopName.present) {
+      map['dest_stop_name'] = Variable<String>(destStopName.value);
+    }
+    if (addedAt.present) {
+      map['added_at'] = Variable<DateTime>(addedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoriteRoutesCompanion(')
+          ..write('id: $id, ')
+          ..write('originLat: $originLat, ')
+          ..write('originLon: $originLon, ')
+          ..write('originName: $originName, ')
+          ..write('destStopId: $destStopId, ')
+          ..write('destStopName: $destStopName, ')
+          ..write('addedAt: $addedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   late final $GtfsStopsTable gtfsStops = $GtfsStopsTable(this);
@@ -2891,6 +3259,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $GtfsCalendarDatesTable(this);
   late final $GtfsShapesTable gtfsShapes = $GtfsShapesTable(this);
   late final $FavoriteStopsTable favoriteStops = $FavoriteStopsTable(this);
+  late final $FavoriteRoutesTable favoriteRoutes = $FavoriteRoutesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2903,6 +3272,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         gtfsCalendar,
         gtfsCalendarDates,
         gtfsShapes,
-        favoriteStops
+        favoriteStops,
+        favoriteRoutes
       ];
 }

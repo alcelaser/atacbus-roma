@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import '../../domain/entities/trip_plan.dart';
 import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/stop_detail/stop_detail_screen.dart';
 import '../../presentation/screens/route_browser/route_browser_screen.dart';
 import '../../presentation/screens/route_detail/route_detail_screen.dart';
 import '../../presentation/screens/navigate/navigate_screen.dart';
+import '../../presentation/screens/trip_detail/trip_detail_screen.dart';
 import '../../presentation/screens/map/map_screen.dart';
 import '../../presentation/screens/alerts/alerts_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
@@ -81,6 +83,14 @@ final GoRouter appRouter = GoRouter(
       path: '/sync',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const SyncScreen(),
+    ),
+    GoRoute(
+      path: '/trip-detail',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final itinerary = state.extra! as TripItinerary;
+        return TripDetailScreen(itinerary: itinerary);
+      },
     ),
   ],
 );

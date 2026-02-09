@@ -158,15 +158,13 @@ void main() {
   group('TripPlanResult', () {
     test('construction with empty itineraries', () {
       const result = TripPlanResult(
-        originStopId: 'stop_a',
-        originStopName: 'Termini',
-        destinationStopId: 'stop_b',
-        destinationStopName: 'Colosseo',
+        originName: 'Termini',
+        destinationName: 'Colosseo',
         itineraries: [],
       );
       expect(result.itineraries, isEmpty);
-      expect(result.originStopName, 'Termini');
-      expect(result.destinationStopName, 'Colosseo');
+      expect(result.originName, 'Termini');
+      expect(result.destinationName, 'Colosseo');
     });
 
     test('construction with itineraries', () {
@@ -184,10 +182,8 @@ void main() {
         alightSequence: 4,
       );
       const result = TripPlanResult(
-        originStopId: 'stop_a',
-        originStopName: 'Termini',
-        destinationStopId: 'stop_b',
-        destinationStopName: 'Colosseo',
+        originName: 'Termini',
+        destinationName: 'Colosseo',
         itineraries: [
           TripItinerary(legs: [leg])
         ],

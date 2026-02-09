@@ -2,6 +2,8 @@ import '../../core/utils/date_time_utils.dart';
 import '../../domain/entities/stop.dart';
 import '../../domain/entities/route_entity.dart';
 import '../../domain/entities/departure.dart';
+import '../../domain/entities/favorite_route.dart';
+import '../../domain/entities/stop_time_detail.dart';
 import '../../domain/repositories/gtfs_repository.dart';
 import '../datasources/local/database/app_database.dart';
 
@@ -299,5 +301,72 @@ class GtfsRepositoryImpl implements GtfsRepository {
     return _db.watchFavorites().map(
           (favs) => favs.map((f) => f.stopId).toList(),
         );
+  }
+
+  // ─── Favorite routes ───────────────────────────────────────────
+
+  Future<List<FavoriteRouteEntity>> getAllFavoriteRoutes() async {
+    final rows = await _db.getAllFavoriteRoutes();
+    return rows
+        .map((r) => FavoriteRouteEntity(
+              id: r.id,
+              originLat: r.originLat,
+              originLon: r.originLon,
+              originName: r.originName,
+              destStopId: r.destStopId,
+              destStopName: r.destStopName,
+              addedAt: r.addedAt,
+            ))
+        .toList();
+  }
+
+  Stream<List<FavoriteRouteEntity>> watchFavoriteRoutes() {
+    return _db.watchFavoriteRoutes().map((rows) => rows
+        .map((r) => FavoriteRouteEntity(
+              id: r.id,
+              originLat: r.originLat,
+              originLon: r.originLon,
+              originName: r.originName,
+              destStopId: r.destStopId,
+              destStopName: r.destStopName,
+              addedAt: r.addedAt,
+            ))
+        .toList());
+  }
+
+  Future<int> addFavoriteRoute({
+    required double originLat,
+    required double originLon,
+    required String originName,
+    required String destStopId,
+    required String destStopName,
+  }) {
+    return _db.addFavoriteRoute(
+      originLat: originLat,
+      originLon: originLon,
+      originName: originName,
+      destStopId: destStopId,
+      destStopName: destStopName,
+    );
+  }
+
+  Future<void> removeFavoriteRoute(int id) => _db.removeFavoriteRoute(id);
+
+  // ─── Stop times for trip detail ────────────────────────────────
+
+  Future<List<StopTimeDetail>> getStopTimesForTripWithNames(
+      String tripId) async {
+    final rows = await _db.getStopTimesForTripWithNames(tripId);
+    return rows
+        .map((r) => StopTimeDetail(
+              stopId: r.stopId,
+              stopName: r.stopName,
+              arrivalTime: r.arrivalTime,
+              departureTime: r.departureTime,
+              stopSequence: r.stopSequence,
+              stopLat: r.stopLat,
+              stopLon: r.stopLon,
+            ))
+        .toList();
   }
 }

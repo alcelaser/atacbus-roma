@@ -31,7 +31,7 @@ class AppTheme {
     );
   }
 
-  /// Dark theme suitable for night mode.
+  /// Dark theme – AMOLED true-black for OLED screens.
   static ThemeData darkTheme() {
     final colorScheme = AppColorSchemes.darkColorScheme();
 
@@ -39,16 +39,22 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: AppTextTheme.textTheme(),
+      scaffoldBackgroundColor: Colors.black,
       navigationBarTheme: NavigationBarThemeData(
         indicatorColor: colorScheme.secondary,
+        backgroundColor: Colors.black,
+        surfaceTintColor: Colors.transparent,
       ),
       cardTheme: CardTheme(
+        color: colorScheme.surfaceVariant,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
       ),
       appBarTheme: const AppBarTheme(
         centerTitle: false,
+        backgroundColor: Colors.black,
+        surfaceTintColor: Colors.transparent,
       ),
     );
   }

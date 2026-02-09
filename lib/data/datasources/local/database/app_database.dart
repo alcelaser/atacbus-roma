@@ -106,6 +106,16 @@ class FavoriteStops extends Table {
   Set<Column> get primaryKey => {stopId};
 }
 
+class FavoriteRoutes extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  RealColumn get originLat => real()();
+  RealColumn get originLon => real()();
+  TextColumn get originName => text()();
+  TextColumn get destStopId => text()();
+  TextColumn get destStopName => text()();
+  DateTimeColumn get addedAt => dateTime()();
+}
+
 // ─── Departure row (from JOIN query) ────────────────────────────
 
 class DepartureRow {
@@ -158,6 +168,28 @@ class DirectTripRow {
   });
 }
 
+// ─── Stop time detail row (for trip detail view) ──────────────────
+
+class StopTimeDetailRow {
+  final String stopId;
+  final String stopName;
+  final String arrivalTime;
+  final String departureTime;
+  final int stopSequence;
+  final double stopLat;
+  final double stopLon;
+
+  StopTimeDetailRow({
+    required this.stopId,
+    required this.stopName,
+    required this.arrivalTime,
+    required this.departureTime,
+    required this.stopSequence,
+    required this.stopLat,
+    required this.stopLon,
+  });
+}
+
 // ─── Database ─────────────────────────────────────────────────────
 
 @DriftDatabase(tables: [
@@ -169,6 +201,7 @@ class DirectTripRow {
   GtfsCalendarDates,
   GtfsShapes,
   FavoriteStops,
+  FavoriteRoutes,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -176,7 +209,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -185,6 +218,9 @@ class AppDatabase extends _$AppDatabase {
           await _createIndexes();
         },
         onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 3) {
+            await m.createTable(favoriteRoutes);
+          }
           // Re-create indexes on every upgrade to ensure they exist
           await _createIndexes();
         },
@@ -590,6 +626,69 @@ class AppDatabase extends _$AppDatabase {
     return (select(favoriteStops)
           ..orderBy([(f) => OrderingTerm.desc(f.addedAt)]))
         .watch();
+  }
+
+  // ─── Favorite route queries ─────────────────────────────────────
+
+  Future<List<FavoriteRoute>> getAllFavoriteRoutes() {
+    return (select(favoriteRoutes)
+          ..orderBy([(f) => OrderingTerm.desc(f.addedAt)]))
+        .get();
+  }
+
+  Stream<List<FavoriteRoute>> watchFavoriteRoutes() {
+    return (select(favoriteRoutes)
+          ..orderBy([(f) => OrderingTerm.desc(f.addedAt)]))
+        .watch();
+  }
+
+  Future<int> addFavoriteRoute({
+    required double originLat,
+    required double originLon,
+    required String originName,
+    required String destStopId,
+    required String destStopName,
+  }) {
+    return into(favoriteRoutes).insert(
+      FavoriteRoutesCompanion.insert(
+        originLat: originLat,
+        originLon: originLon,
+        originName: originName,
+        destStopId: destStopId,
+        destStopName: destStopName,
+        addedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  Future<void> removeFavoriteRoute(int id) async {
+    await (delete(favoriteRoutes)..where((f) => f.id.equals(id))).go();
+  }
+
+  // ─── Stop times with names (for trip detail) ────────────────────
+
+  Future<List<StopTimeDetailRow>> getStopTimesForTripWithNames(
+      String tripId) async {
+    final results = await customSelect('''
+      SELECT st.stop_id, st.arrival_time, st.departure_time, st.stop_sequence,
+             s.stop_name, s.stop_lat, s.stop_lon
+      FROM gtfs_stop_times st
+      INNER JOIN gtfs_stops s ON s.stop_id = st.stop_id
+      WHERE st.trip_id = ?
+      ORDER BY st.stop_sequence
+    ''', variables: [Variable.withString(tripId)]).get();
+
+    return results
+        .map((row) => StopTimeDetailRow(
+              stopId: row.read<String>('stop_id'),
+              stopName: row.read<String>('stop_name'),
+              arrivalTime: row.read<String>('arrival_time'),
+              departureTime: row.read<String>('departure_time'),
+              stopSequence: row.read<int>('stop_sequence'),
+              stopLat: row.read<double>('stop_lat'),
+              stopLon: row.read<double>('stop_lon'),
+            ))
+        .toList();
   }
 
   // ─── Trip planning queries ──────────────────────────────────────

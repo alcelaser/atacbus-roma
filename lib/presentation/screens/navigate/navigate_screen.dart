@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/utils/date_time_utils.dart';
 import '../../../domain/entities/stop.dart';
 import '../../../domain/entities/trip_plan.dart';
@@ -53,7 +55,7 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
   }
 
   void _selectOrigin(Stop stop) {
-    ref.read(tripOriginProvider.notifier).state = stop;
+    ref.read(tripOriginProvider.notifier).state = TripOrigin.stop(stop);
     _originController.text = stop.stopName;
     setState(() => _showOriginResults = false);
     ref.read(originSearchQueryProvider.notifier).state = '';
@@ -69,16 +71,185 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
   void _swapStops() {
     final origin = ref.read(tripOriginProvider);
     final destination = ref.read(tripDestinationProvider);
-    ref.read(tripOriginProvider.notifier).state = destination;
-    ref.read(tripDestinationProvider.notifier).state = origin;
-    _originController.text = destination?.stopName ?? '';
-    _destinationController.text = origin?.stopName ?? '';
+
+    if (origin != null && origin.selectedStop != null && destination != null) {
+      ref.read(tripOriginProvider.notifier).state =
+          TripOrigin.stop(destination);
+      ref.read(tripDestinationProvider.notifier).state = origin.selectedStop;
+      _originController.text = destination.stopName;
+      _destinationController.text = origin.name;
+    } else if (destination != null) {
+      ref.read(tripOriginProvider.notifier).state =
+          TripOrigin.stop(destination);
+      ref.read(tripDestinationProvider.notifier).state = null;
+      _originController.text = destination.stopName;
+      _destinationController.text = '';
+    }
   }
 
   void _useMyLocation() async {
-    final nearbyStops = await ref.read(nearbyStopsProvider.future);
-    if (nearbyStops.isNotEmpty && mounted) {
-      _selectOrigin(nearbyStops.first.stop);
+    final l10n = AppLocalizations.of(context)!;
+
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    if (permission == LocationPermission.deniedForever) return;
+
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.medium,
+    );
+
+    if (!mounted) return;
+
+    ref.read(tripOriginProvider.notifier).state = TripOrigin.gps(
+      lat: position.latitude,
+      lon: position.longitude,
+      name: l10n.myLocation,
+    );
+    _originController.text = l10n.myLocation;
+    setState(() => _showOriginResults = false);
+  }
+
+  void _saveRoute() {
+    final origin = ref.read(tripOriginProvider);
+    final destination = ref.read(tripDestinationProvider);
+    if (origin == null || destination == null) return;
+
+    final repo = ref.read(gtfsRepositoryProvider);
+    repo.addFavoriteRoute(
+      originLat: origin.lat,
+      originLon: origin.lon,
+      originName: origin.name,
+      destStopId: destination.stopId,
+      destStopName: destination.stopName,
+    );
+
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.routeSaved)),
+    );
+  }
+
+  void _showSavedRoutes() {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final favRoutes = ref.watch(favoriteRoutesProvider);
+            return favRoutes.when(
+              data: (routes) {
+                if (routes.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        l10n.noSavedRoutes,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: routes.length,
+                  itemBuilder: (context, index) {
+                    final route = routes[index];
+                    return ListTile(
+                      leading: const Icon(Icons.alt_route),
+                      title: Text(
+                        '${route.originName} \u2192 ${route.destStopName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        onPressed: () {
+                          _confirmDeleteRoute(sheetContext, route.id);
+                        },
+                      ),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _loadFavoriteRoute(
+                          route.originLat,
+                          route.originLon,
+                          route.originName,
+                          route.destStopId,
+                          route.destStopName,
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteRoute(BuildContext sheetContext, int id) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: sheetContext,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.deleteRoute),
+          content: Text(l10n.confirmDeleteRoute),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () {
+                ref.read(gtfsRepositoryProvider).removeFavoriteRoute(id);
+                Navigator.pop(dialogContext);
+              },
+              child: Text(l10n.deleteRoute),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _loadFavoriteRoute(
+    double originLat,
+    double originLon,
+    String originName,
+    String destStopId,
+    String destStopName,
+  ) async {
+    ref.read(tripOriginProvider.notifier).state = TripOrigin.gps(
+      lat: originLat,
+      lon: originLon,
+      name: originName,
+    );
+    _originController.text = originName;
+
+    final repo = ref.read(gtfsRepositoryProvider);
+    final stop = await repo.getStopById(destStopId);
+    if (stop != null && mounted) {
+      _selectDestination(stop);
+    } else if (mounted) {
+      _destinationController.text = destStopName;
     }
   }
 
@@ -86,16 +257,30 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final origin = ref.watch(tripOriginProvider);
+    final destination = ref.watch(tripDestinationProvider);
+    final canSave = origin != null && destination != null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.navigate),
+        actions: [
+          if (canSave)
+            IconButton(
+              icon: const Icon(Icons.bookmark_add_outlined),
+              tooltip: l10n.saveRoute,
+              onPressed: _saveRoute,
+            ),
+          IconButton(
+            icon: const Icon(Icons.bookmarks_outlined),
+            tooltip: l10n.savedRoutes,
+            onPressed: _showSavedRoutes,
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Input area
           _buildInputCard(theme, l10n),
-          // Results
           Expanded(
             child: _buildResults(theme, l10n),
           ),
@@ -112,7 +297,6 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Origin input
             Row(
               children: [
                 Container(
@@ -150,10 +334,8 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
                 ),
               ],
             ),
-            // Origin autocomplete
             if (_showOriginResults) _buildOriginAutocomplete(theme),
             const Divider(height: 1),
-            // Destination input
             Row(
               children: [
                 Container(
@@ -191,7 +373,6 @@ class _NavigateScreenState extends ConsumerState<NavigateScreen> {
                 ),
               ],
             ),
-            // Destination autocomplete
             if (_showDestinationResults) _buildDestinationAutocomplete(theme),
           ],
         ),
@@ -335,79 +516,88 @@ class _ItineraryCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: type + total duration
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: itinerary.isDirect
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.tertiaryContainer,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    itinerary.isDirect ? l10n.direct : l10n.transfer,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: itinerary.isDirect
-                          ? theme.colorScheme.onPrimaryContainer
-                          : theme.colorScheme.onTertiaryContainer,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  l10n.totalDuration(duration),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Legs
-            ...itinerary.legs.asMap().entries.map((entry) {
-              final index = entry.key;
-              final leg = entry.value;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          context.push('/trip-detail', extra: itinerary);
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  if (index > 0) ...[
-                    // Transfer indicator
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.transfer_within_a_station,
-                            size: 16,
-                            color: theme.colorScheme.tertiary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            l10n.transferAt(leg.boardStopName),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.tertiary,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: itinerary.isDirect
+                          ? theme.colorScheme.primaryContainer
+                          : theme.colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      itinerary.isDirect ? l10n.direct : l10n.transfer,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: itinerary.isDirect
+                            ? theme.colorScheme.onPrimaryContainer
+                            : theme.colorScheme.onTertiaryContainer,
                       ),
                     ),
-                  ],
-                  _buildLegRow(leg, theme, l10n),
+                  ),
+                  const Spacer(),
+                  Text(
+                    l10n.totalDuration(duration),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
+                  ),
                 ],
-              );
-            }),
-          ],
+              ),
+              const SizedBox(height: 8),
+              ...itinerary.legs.asMap().entries.map((entry) {
+                final index = entry.key;
+                final leg = entry.value;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (index > 0) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.transfer_within_a_station,
+                              size: 16,
+                              color: theme.colorScheme.tertiary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.transferAt(leg.boardStopName),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.tertiary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    _buildLegRow(leg, theme, l10n),
+                  ],
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );

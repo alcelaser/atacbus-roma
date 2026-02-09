@@ -151,5 +151,31 @@
         "type": "int"
       }
     }
+  },
+  "myLocation": "My Location",
+  "savedRoutes": "Saved Routes",
+  "noSavedRoutes": "No saved routes yet",
+  "routeSaved": "Route saved",
+  "tripDetail": "Trip Detail",
+  "board": "Board",
+  "alight": "Alight",
+  "intermediateStops": "{count} intermediate stops",
+  "@intermediateStops": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "saveRoute": "Save route",
+  "deleteRoute": "Delete route",
+  "confirmDeleteRoute": "Delete this saved route?",
+  "waitMinutes": "Wait {minutes} min",
+  "@waitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
   }
 }
