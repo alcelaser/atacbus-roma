@@ -2,7 +2,7 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'BUS - Roma';
-  static const String appVersion = '0.0.17';
+  static const String appVersion = '0.0.18';
   static const int dbBatchSize = 5000;
   static const double defaultLatitude = 41.9028;
   static const double defaultLongitude = 12.4964;
@@ -13,4 +13,6 @@ class AppConstants {
   static const int maxTripResults = 20;
   static const String prefsKeyLastSync = 'last_sync_date';
   static const String prefsKeyThemeMode = 'theme_mode';
+  static const String prefsKeyLastZipHash = 'last_zip_hash';
+  static const String prefsKeyFileHashes = 'file_hashes';
 }

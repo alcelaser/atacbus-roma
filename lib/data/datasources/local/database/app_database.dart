@@ -275,6 +275,35 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  // ─── Per-table clear (for differential sync) ─────────────────
+
+  Future<void> clearStops() => delete(gtfsStops).go();
+  Future<void> clearRoutes() => delete(gtfsRoutes).go();
+  Future<void> clearTrips() => delete(gtfsTrips).go();
+  Future<void> clearStopTimes() => delete(gtfsStopTimes).go();
+  Future<void> clearCalendar() => delete(gtfsCalendar).go();
+  Future<void> clearCalendarDates() => delete(gtfsCalendarDates).go();
+  Future<void> clearShapes() => delete(gtfsShapes).go();
+
+  /// Atomically replace a table's contents: clear + insert all rows
+  /// within a single DB transaction. If the insert fails, the DELETE
+  /// is rolled back and the old data is preserved.
+  Future<void> replaceTableAtomically<T>(
+    Future<void> Function() clearFn,
+    Future<void> Function(List<T> rows) insertFn,
+    List<T> rows,
+  ) async {
+    await transaction(() async {
+      await clearFn();
+      // Batch insert within the same transaction
+      for (var i = 0; i < rows.length; i += 5000) {
+        final end = (i + 5000).clamp(0, rows.length);
+        await insertFn(rows.sublist(i, end));
+      }
+    });
+  }
+
+
   // ─── Batch inserts ────────────────────────────────────────────
 
   Future<void> insertStops(List<GtfsStopsCompanion> rows) async {

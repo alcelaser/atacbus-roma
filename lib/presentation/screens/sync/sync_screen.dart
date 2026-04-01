@@ -39,7 +39,10 @@ class _SyncScreenState extends ConsumerState<SyncScreen> {
             if (progress.stage == SyncStage.complete) {
               ref.read(gtfsRepositoryProvider).clearCache();
               ref.invalidate(hasCompletedSyncProvider);
-              Future.delayed(const Duration(milliseconds: 500), () {
+              final delay = progress.skippedBecauseUpToDate
+                  ? const Duration(milliseconds: 300)
+                  : const Duration(milliseconds: 500);
+              Future.delayed(delay, () {
                 if (mounted) context.go('/');
               });
             }
@@ -86,6 +89,8 @@ class _SyncScreenState extends ConsumerState<SyncScreen> {
     switch (stage) {
       case SyncStage.downloading:
         return l10n.syncDownloading;
+      case SyncStage.comparing:
+        return 'Checking for updates...';
       case SyncStage.extracting:
         return l10n.syncExtracting;
       case SyncStage.importingStops:

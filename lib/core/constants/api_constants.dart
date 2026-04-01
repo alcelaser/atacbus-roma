@@ -3,6 +3,8 @@ class ApiConstants {
 
   static const String gtfsStaticUrl =
       'https://romamobilita.it/sites/default/files/rome_static_gtfs.zip';
+  static const String gtfsStaticMd5Url =
+      'https://romamobilita.it/sites/default/files/rome_static_gtfs.zip.md5';
   static const String gtfsRtTripUpdatesUrl =
       'https://romamobilita.it/sites/default/files/rome_rtgtfs_trip_updates_feed.pb';
   static const String gtfsRtVehiclePositionsUrl =

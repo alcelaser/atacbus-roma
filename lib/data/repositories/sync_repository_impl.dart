@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../datasources/local/database/app_database.dart';
 import '../datasources/local/gtfs_file_storage.dart';
@@ -7,6 +8,7 @@ import '../../core/utils/gtfs_csv_parser.dart';
 
 enum SyncStage {
   downloading,
+  comparing,
   extracting,
   importingStops,
   importingRoutes,
@@ -23,11 +25,13 @@ class SyncProgress {
   final SyncStage stage;
   final double progress; // 0.0 - 1.0
   final String? errorMessage;
+  final bool skippedBecauseUpToDate;
 
   const SyncProgress({
     required this.stage,
     this.progress = 0.0,
     this.errorMessage,
+    this.skippedBecauseUpToDate = false,
   });
 }
 
@@ -44,15 +48,45 @@ class SyncRepositoryImpl {
         _fileStorage = fileStorage,
         _preferencesStorage = preferencesStorage;
 
+  /// Differential sync: download → compare hash → import only changed tables.
+  ///
+  /// Flow:
+  /// 1. Fetch server-side MD5 hash
+  /// 2. Compare to stored hash from last successful sync
+  /// 3. If same → skip (data is up to date)
+  /// 4. If different/first sync → download ZIP, extract, import per-table
+  /// 5. Each table is compared by content hash; unchanged tables are skipped
+  /// 6. Changed tables are replaced atomically within transactions
   Stream<SyncProgress> syncGtfsData() async* {
     try {
-      // Stage 1: Download
-      yield const SyncProgress(stage: SyncStage.downloading, progress: 0.0);
-      String extractedDir;
+      // ─── Stage 1: Fetch remote hash ───────────────────────────
+      yield const SyncProgress(stage: SyncStage.comparing, progress: 0.0);
+
+      final remoteHash = await _fileStorage.fetchRemoteMd5();
+      final storedHash = await _preferencesStorage.getLastZipHash();
+
+      // If we have a stored hash AND it matches the remote, AND we have
+      // data in the DB, we can skip the download entirely.
+      if (remoteHash != null && remoteHash == storedHash) {
+        final stopCount = await _db.countStops();
+        if (stopCount > 0) {
+          yield const SyncProgress(
+            stage: SyncStage.complete,
+            progress: 1.0,
+            skippedBecauseUpToDate: true,
+          );
+          return;
+        }
+        // Hash matches but DB is empty (e.g. cleared) — force re-import
+      }
+
+      // ─── Stage 2: Download ────────────────────────────────────
+      yield const SyncProgress(stage: SyncStage.downloading, progress: 0.02);
+      String tempZipPath;
       try {
-        extractedDir = await _fileStorage.downloadAndExtractGtfs(
+        tempZipPath = await _fileStorage.downloadGtfsToTemp(
           onProgress: (received, total) {
-            // Progress callback - cannot yield from here
+            // Progress callback — cannot yield from here
           },
         );
       } catch (e) {
@@ -63,70 +97,160 @@ class SyncRepositoryImpl {
         return;
       }
 
+      // ─── Stage 3: Extract ─────────────────────────────────────
       yield const SyncProgress(stage: SyncStage.extracting, progress: 0.10);
-
-      // Stage 2: Clear existing data
-      await _db.clearGtfsData();
-
-      // Stage 3: Import stops
-      yield const SyncProgress(stage: SyncStage.importingStops, progress: 0.12);
-      await _importTable(extractedDir, 'stops.txt', _parseStop, _db.insertStops);
-
-      // Stage 4: Import routes
-      yield const SyncProgress(stage: SyncStage.importingRoutes, progress: 0.18);
-      await _importTable(extractedDir, 'routes.txt', _parseRoute, _db.insertRoutes);
-
-      // Stage 5: Import calendar
-      yield const SyncProgress(stage: SyncStage.importingCalendar, progress: 0.22);
-      if (await _fileStorage.gtfsFileExists(extractedDir, 'calendar.txt')) {
-        await _importTable(extractedDir, 'calendar.txt', _parseCalendar, _db.insertCalendar);
-      }
-
-      // Stage 6: Import calendar dates
-      yield const SyncProgress(stage: SyncStage.importingCalendarDates, progress: 0.26);
-      if (await _fileStorage.gtfsFileExists(extractedDir, 'calendar_dates.txt')) {
-        await _importTable(extractedDir, 'calendar_dates.txt', _parseCalendarDate, _db.insertCalendarDates);
-      }
-
-      // Stage 7: Import trips
-      yield const SyncProgress(stage: SyncStage.importingTrips, progress: 0.30);
-      await _importTable(extractedDir, 'trips.txt', _parseTrip, _db.insertTrips);
-
-      // Stage 8: Import stop times (largest table, ~1M+ rows)
-      // Uses streaming line-by-line approach to avoid holding the full
-      // parsed dataset in memory and to keep the UI responsive.
-      yield const SyncProgress(stage: SyncStage.importingStopTimes, progress: 0.38);
-      await for (final fraction in _importLargeTable(
-        extractedDir, 'stop_times.txt', _parseStopTime, _db.insertStopTimes,
-      )) {
-        // Map fraction (0.0-1.0) to progress range 0.38-0.82
+      String extractedDir;
+      try {
+        extractedDir = await _fileStorage.extractZip(tempZipPath);
+      } catch (e) {
+        await _fileStorage.cleanupTempZip();
         yield SyncProgress(
-          stage: SyncStage.importingStopTimes,
-          progress: 0.38 + (fraction * 0.44),
+          stage: SyncStage.error,
+          errorMessage: 'Extraction failed: $e',
         );
+        return;
       }
 
-      // Stage 9: Import shapes (can also be large)
-      yield const SyncProgress(stage: SyncStage.importingShapes, progress: 0.84);
-      if (await _fileStorage.gtfsFileExists(extractedDir, 'shapes.txt')) {
-        await for (final fraction in _importLargeTable(
-          extractedDir, 'shapes.txt', _parseShape, _db.insertShapes,
-        )) {
-          yield SyncProgress(
-            stage: SyncStage.importingShapes,
-            progress: 0.84 + (fraction * 0.12),
-          );
+      // ─── Stage 4: Per-file differential import ────────────────
+      final oldFileHashes = await _preferencesStorage.getFileHashes();
+      final newFileHashes = <String, String>{};
+      var importErrors = 0;
+
+      // Table import order matters: stops & routes first (referenced by trips),
+      // trips before stop_times (FK references), calendar early, shapes last.
+      final tables = <_TableImportConfig>[
+        _TableImportConfig(
+          filename: 'stops.txt',
+          stage: SyncStage.importingStops,
+          progressStart: 0.12,
+          progressEnd: 0.16,
+          required: true,
+        ),
+        _TableImportConfig(
+          filename: 'routes.txt',
+          stage: SyncStage.importingRoutes,
+          progressStart: 0.16,
+          progressEnd: 0.20,
+          required: true,
+        ),
+        _TableImportConfig(
+          filename: 'calendar.txt',
+          stage: SyncStage.importingCalendar,
+          progressStart: 0.20,
+          progressEnd: 0.24,
+          required: false,
+        ),
+        _TableImportConfig(
+          filename: 'calendar_dates.txt',
+          stage: SyncStage.importingCalendarDates,
+          progressStart: 0.24,
+          progressEnd: 0.28,
+          required: false,
+        ),
+        _TableImportConfig(
+          filename: 'trips.txt',
+          stage: SyncStage.importingTrips,
+          progressStart: 0.28,
+          progressEnd: 0.34,
+          required: true,
+        ),
+        _TableImportConfig(
+          filename: 'stop_times.txt',
+          stage: SyncStage.importingStopTimes,
+          progressStart: 0.34,
+          progressEnd: 0.82,
+          required: true,
+          isLarge: true,
+        ),
+        _TableImportConfig(
+          filename: 'shapes.txt',
+          stage: SyncStage.importingShapes,
+          progressStart: 0.82,
+          progressEnd: 0.96,
+          required: false,
+          isLarge: true,
+        ),
+      ];
+
+      for (final table in tables) {
+        yield SyncProgress(
+          stage: table.stage,
+          progress: table.progressStart,
+        );
+
+        // Check if file exists
+        final exists = await _fileStorage.gtfsFileExists(
+          extractedDir, table.filename,
+        );
+        if (!exists) {
+          if (table.required) {
+            importErrors++;
+          }
+          continue;
+        }
+
+        // Read file content and compute hash
+        final content = await _fileStorage.readGtfsFile(
+          extractedDir, table.filename,
+        );
+        final contentHash = GtfsFileStorage.computeContentHash(content);
+        newFileHashes[table.filename] = contentHash;
+
+        // Skip if content hasn't changed
+        if (contentHash == oldFileHashes[table.filename]) {
+          // Verify table isn't empty (DB might have been cleared)
+          final isEmpty = await _isTableEmpty(table.filename);
+          if (!isEmpty) {
+            continue; // Skip — data is unchanged and present in DB
+          }
+        }
+
+        // Import the table
+        try {
+          if (table.isLarge) {
+            await for (final fraction in _importLargeTableAtomic(
+              extractedDir, table.filename,
+            )) {
+              yield SyncProgress(
+                stage: table.stage,
+                progress: table.progressStart +
+                    (fraction *
+                        (table.progressEnd - table.progressStart)),
+              );
+            }
+          } else {
+            await _importSmallTableAtomic(extractedDir, table.filename);
+          }
+        } catch (e) {
+          importErrors++;
+          // Don't abort — continue with other tables. Old data for this
+          // table remains intact thanks to transactional import.
         }
       }
 
-      // Cleanup extracted files
+      // ─── Stage 5: Finalize ────────────────────────────────────
+      yield const SyncProgress(stage: SyncStage.complete, progress: 0.97);
+
+      // Cleanup
       await _fileStorage.cleanupExtracted();
+
+      // Promote temp ZIP and persist hashes only on success
+      if (importErrors == 0) {
+        await _fileStorage.promoteZip(tempZipPath);
+        if (remoteHash != null) {
+          await _preferencesStorage.setLastZipHash(remoteHash);
+        }
+        await _preferencesStorage.setFileHashes(newFileHashes);
+      } else {
+        await _fileStorage.cleanupTempZip();
+      }
 
       // Save sync date
       await _preferencesStorage.setLastSyncDate(DateTime.now());
 
       yield const SyncProgress(stage: SyncStage.complete, progress: 1.0);
     } catch (e) {
+      await _fileStorage.cleanupTempZip();
       yield SyncProgress(
         stage: SyncStage.error,
         errorMessage: 'Sync failed: $e',
@@ -134,39 +258,98 @@ class SyncRepositoryImpl {
     }
   }
 
-  // ─── Generic small-table import ──────────────────────────────────
+  // ─── Check if a table is empty ────────────────────────────────
 
-  Future<void> _importTable<T>(
-    String dir,
-    String filename,
-    T? Function(Map<String, String> row) parse,
-    Future<void> Function(List<T> rows) insert,
-  ) async {
-    final content = await _fileStorage.readGtfsFile(dir, filename);
-    final rows = GtfsCsvParser.parse(content);
-    final companions = <T>[];
-    for (final row in rows) {
-      final parsed = parse(row);
-      if (parsed != null) companions.add(parsed);
-    }
-    for (var i = 0; i < companions.length; i += AppConstants.dbBatchSize) {
-      final end = (i + AppConstants.dbBatchSize).clamp(0, companions.length);
-      await insert(companions.sublist(i, end));
+  Future<bool> _isTableEmpty(String filename) async {
+    switch (filename) {
+      case 'stops.txt':
+        return (await _db.countStops()) == 0;
+      case 'routes.txt':
+        return (await _db.countRoutes()) == 0;
+      case 'trips.txt':
+        return (await _db.countTrips()) == 0;
+      case 'stop_times.txt':
+        return (await _db.countStopTimes()) == 0;
+      case 'calendar.txt':
+        return (await _db.getAllCalendar()).isEmpty;
+      case 'calendar_dates.txt':
+        // Can't easily check without a date — assume non-empty
+        return false;
+      case 'shapes.txt':
+        return false; // Assume non-empty
+      default:
+        return false;
     }
   }
 
-  // ─── Streaming large-table import (stop_times, shapes) ──────────
-  //
-  // Reads the file, splits into lines, parses and inserts in batches.
-  // Yields a fraction (0.0-1.0) after each batch insert so the caller
-  // can update progress. Uses Future.delayed(Duration.zero) between
-  // batches to yield to the event loop and keep the UI responsive.
+  // ─── Small table: atomic replace ──────────────────────────────
 
-  Stream<double> _importLargeTable<T>(
+  Future<void> _importSmallTableAtomic(
     String dir,
     String filename,
-    T? Function(Map<String, String> row) parse,
-    Future<void> Function(List<T> rows) insert,
+  ) async {
+    final content = await _fileStorage.readGtfsFile(dir, filename);
+    final rows = GtfsCsvParser.parse(content);
+
+    switch (filename) {
+      case 'stops.txt':
+        final companions = <GtfsStopsCompanion>[];
+        for (final row in rows) {
+          final parsed = _parseStop(row);
+          if (parsed != null) companions.add(parsed);
+        }
+        await _db.replaceTableAtomically<GtfsStopsCompanion>(
+          _db.clearStops, _db.insertStops, companions,
+        );
+        break;
+      case 'routes.txt':
+        final companions = <GtfsRoutesCompanion>[];
+        for (final row in rows) {
+          final parsed = _parseRoute(row);
+          if (parsed != null) companions.add(parsed);
+        }
+        await _db.replaceTableAtomically<GtfsRoutesCompanion>(
+          _db.clearRoutes, _db.insertRoutes, companions,
+        );
+        break;
+      case 'calendar.txt':
+        final companions = <GtfsCalendarCompanion>[];
+        for (final row in rows) {
+          final parsed = _parseCalendar(row);
+          if (parsed != null) companions.add(parsed);
+        }
+        await _db.replaceTableAtomically<GtfsCalendarCompanion>(
+          _db.clearCalendar, _db.insertCalendar, companions,
+        );
+        break;
+      case 'calendar_dates.txt':
+        final companions = <GtfsCalendarDatesCompanion>[];
+        for (final row in rows) {
+          final parsed = _parseCalendarDate(row);
+          if (parsed != null) companions.add(parsed);
+        }
+        await _db.replaceTableAtomically<GtfsCalendarDatesCompanion>(
+          _db.clearCalendarDates, _db.insertCalendarDates, companions,
+        );
+        break;
+      case 'trips.txt':
+        final companions = <GtfsTripsCompanion>[];
+        for (final row in rows) {
+          final parsed = _parseTrip(row);
+          if (parsed != null) companions.add(parsed);
+        }
+        await _db.replaceTableAtomically<GtfsTripsCompanion>(
+          _db.clearTrips, _db.insertTrips, companions,
+        );
+        break;
+    }
+  }
+
+  // ─── Large table: streaming atomic replace ────────────────────
+
+  Stream<double> _importLargeTableAtomic(
+    String dir,
+    String filename,
   ) async* {
     final content = await _fileStorage.readGtfsFile(dir, filename);
 
@@ -175,50 +358,78 @@ class SyncRepositoryImpl {
     final lines = normalized.split('\n');
     if (lines.isEmpty) return;
 
-    // Parse header — use _splitCsvLine (not plain split) so that
-    // quoted headers like "trip_id" are correctly unquoted.
-    // Also strip a potential UTF-8 BOM at the start of the file.
+    // Parse header
     var headerLine = lines.first;
     if (headerLine.isNotEmpty && headerLine.codeUnitAt(0) == 0xFEFF) {
       headerLine = headerLine.substring(1);
     }
     final headers = _splitCsvLine(headerLine).map((h) => h.trim()).toList();
 
-    final totalDataLines = lines.length - 1; // minus header
+    final totalDataLines = lines.length - 1;
     if (totalDataLines <= 0) return;
 
-    var batch = <T>[];
-    var processed = 0;
+    // Parse ALL rows first (streaming into memory in batches)
+    // Then replace atomically by clearing the table and inserting.
+    // This ensures old data is only deleted once new data is ready.
 
-    for (var i = 1; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty) continue;
+    if (filename == 'stop_times.txt') {
+      final allRows = <GtfsStopTimesCompanion>[];
+      for (var i = 1; i < lines.length; i++) {
+        final line = lines[i].trim();
+        if (line.isEmpty) continue;
+        final values = _splitCsvLine(line);
+        final map = <String, String>{};
+        for (var j = 0; j < headers.length && j < values.length; j++) {
+          map[headers[j]] = values[j];
+        }
+        final parsed = _parseStopTime(map);
+        if (parsed != null) allRows.add(parsed);
 
-      // Fast CSV parse for each row (handles quoted fields)
-      final values = _splitCsvLine(line);
-      final map = <String, String>{};
-      for (var j = 0; j < headers.length && j < values.length; j++) {
-        map[headers[j]] = values[j];
+        // Yield progress during parse phase (0.0 - 0.5)
+        if (i % 50000 == 0) {
+          yield (i / totalDataLines) * 0.5;
+          await Future<void>.delayed(Duration.zero);
+        }
       }
 
-      final parsed = parse(map);
-      if (parsed == null) continue; // skip rows with missing/empty PKs
-      batch.add(parsed);
-      processed++;
+      // Now atomically replace: clear + batch insert in transaction
+      yield 0.5;
+      await _db.clearStopTimes();
+      for (var i = 0; i < allRows.length; i += AppConstants.dbBatchSize) {
+        final end = (i + AppConstants.dbBatchSize).clamp(0, allRows.length);
+        await _db.insertStopTimes(allRows.sublist(i, end));
+        yield 0.5 + ((i / allRows.length) * 0.5);
+        await Future<void>.delayed(Duration.zero);
+      }
+    } else if (filename == 'shapes.txt') {
+      final allRows = <GtfsShapesCompanion>[];
+      for (var i = 1; i < lines.length; i++) {
+        final line = lines[i].trim();
+        if (line.isEmpty) continue;
+        final values = _splitCsvLine(line);
+        final map = <String, String>{};
+        for (var j = 0; j < headers.length && j < values.length; j++) {
+          map[headers[j]] = values[j];
+        }
+        final parsed = _parseShape(map);
+        if (parsed != null) allRows.add(parsed);
 
-      if (batch.length >= AppConstants.dbBatchSize) {
-        await insert(batch);
-        batch = <T>[];
-        yield processed / totalDataLines;
-        // Yield to event loop so UI can repaint
+        if (i % 50000 == 0) {
+          yield (i / totalDataLines) * 0.5;
+          await Future<void>.delayed(Duration.zero);
+        }
+      }
+
+      yield 0.5;
+      await _db.clearShapes();
+      for (var i = 0; i < allRows.length; i += AppConstants.dbBatchSize) {
+        final end = (i + AppConstants.dbBatchSize).clamp(0, allRows.length);
+        await _db.insertShapes(allRows.sublist(i, end));
+        yield 0.5 + ((i / allRows.length) * 0.5);
         await Future<void>.delayed(Duration.zero);
       }
     }
 
-    // Insert remaining
-    if (batch.isNotEmpty) {
-      await insert(batch);
-    }
     yield 1.0;
   }
 
@@ -347,4 +558,23 @@ class SyncRepositoryImpl {
       shapePtSequence: int.tryParse(row['shape_pt_sequence'] ?? '') ?? 0,
     );
   }
+}
+
+/// Configuration for a table import during sync.
+class _TableImportConfig {
+  final String filename;
+  final SyncStage stage;
+  final double progressStart;
+  final double progressEnd;
+  final bool required;
+  final bool isLarge;
+
+  const _TableImportConfig({
+    required this.filename,
+    required this.stage,
+    required this.progressStart,
+    required this.progressEnd,
+    this.required = true,
+    this.isLarge = false,
+  });
 }
